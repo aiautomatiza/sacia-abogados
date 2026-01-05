@@ -10,10 +10,10 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.manage-tenant-settings]
-verify_jwt = true
+verify_jwt = false
 
 [functions.invite-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.complete-invitation]
 verify_jwt = false
