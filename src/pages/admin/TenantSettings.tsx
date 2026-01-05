@@ -50,13 +50,9 @@ export default function TenantSettings() {
     const fetchSettings = async () => {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        
+
         const response = await supabase.functions.invoke('manage-tenant-settings', {
           body: { action: 'get', tenant_id: id },
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-          },
         });
 
         if (response.error) throw response.error;
@@ -134,10 +130,8 @@ export default function TenantSettings() {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const body: any = { 
-        action: 'update', 
+      const body: any = {
+        action: 'update',
         tenant_id: id,
         settings
       };
@@ -152,9 +146,6 @@ export default function TenantSettings() {
 
       const response = await supabase.functions.invoke('manage-tenant-settings', {
         body,
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
       });
 
       if (response.error) throw response.error;

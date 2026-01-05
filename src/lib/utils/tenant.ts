@@ -68,10 +68,6 @@ export async function getCurrentUserScope(): Promise<UserScope> {
     throw new Error(`Failed to fetch profile: ${profileError.message}`);
   }
 
-  if (!profile?.tenant_id) {
-    throw new Error('User profile has no tenant_id. Please contact support.');
-  }
-
   // Get role
   const { data: roleData } = await supabase
     .from('user_roles')
@@ -79,10 +75,17 @@ export async function getCurrentUserScope(): Promise<UserScope> {
     .eq('user_id', user.id)
     .maybeSingle();
 
+  const isSuperAdmin = roleData?.role === 'super_admin';
+
+  // SuperAdmins may not have a tenant_id - that's OK
+  if (!profile?.tenant_id && !isSuperAdmin) {
+    throw new Error('User profile has no tenant_id. Please contact support.');
+  }
+
   return {
     userId: user.id,
-    tenantId: profile.tenant_id,
-    isSuperAdmin: roleData?.role === 'super_admin',
+    tenantId: profile.tenant_id || '', // Empty string for superAdmins without tenant
+    isSuperAdmin,
   };
 }
 

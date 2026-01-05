@@ -1,8 +1,9 @@
-import { 
-  Building2, 
-  LogOut, 
-  ChevronLeft, 
-  ChevronRight 
+import {
+  Building2,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Plug
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +35,13 @@ const adminNavigationItems: NavigationItem[] = [
     group: 'Administración',
     roles: ['super_admin'],
   },
+  {
+    title: 'Integraciones',
+    url: '/admin/integrations',
+    icon: Plug,
+    group: 'Administración',
+    roles: ['super_admin'],
+  },
 ];
 
 export function AdminSidebar() {
@@ -57,8 +65,8 @@ export function AdminSidebar() {
   }, {} as Record<string, typeof adminNavigationItems>);
 
   return (
-    <Sidebar 
-      collapsible="icon" 
+    <Sidebar
+      collapsible="icon"
       className="border-r"
     >
       {/* Header con logo y botón toggle */}
@@ -66,9 +74,9 @@ export function AdminSidebar() {
         <div className="flex items-center justify-between">
           {/* Logo y texto - se ocultan en modo icon */}
           <div className="flex items-center space-x-3 py-2 group-data-[collapsible=icon]:hidden">
-            <img 
-              src={logoAIAutomatiza} 
-              alt="AIAutomatiza Logo" 
+            <img
+              src={logoAIAutomatiza}
+              alt="AIAutomatiza Logo"
               className="h-6 w-auto"
             />
             <div>
@@ -78,7 +86,7 @@ export function AdminSidebar() {
               <span className="block text-xs text-muted-foreground">Panel Admin</span>
             </div>
           </div>
-          
+
           {/* Botón toggle - se centra en modo icon */}
           <Button
             variant="ghost"
@@ -111,7 +119,7 @@ export function AdminSidebar() {
               <SidebarMenu>
                 {items.map((item) => (
                   <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton 
+                    <SidebarMenuButton
                       asChild
                       tooltip={item.title}
                       className="group-data-[collapsible=icon]:justify-center px-3 py-2.5"
@@ -147,7 +155,7 @@ export function AdminSidebar() {
             <LogOut className="h-5 w-5 shrink-0 group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:w-6 transition-all" />
             <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
           </Button>
-          
+
           {/* Info de versión - se oculta en modo icon */}
           <div className="text-xs text-sidebar-foreground/50 text-center mt-2 group-data-[collapsible=icon]:hidden">
             <p className="font-medium">AIAutomatiza v1.0.0</p>

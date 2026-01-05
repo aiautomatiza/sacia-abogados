@@ -60,23 +60,19 @@ export function AssignUserDialog({ open, onOpenChange, tenantId, onSuccess }: As
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedUser || !tenantId) return;
 
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
+
       const response = await supabase.functions.invoke('manage-tenants', {
-        body: { 
+        body: {
           action: 'assign_user',
-          tenant_data: { 
+          tenant_data: {
             user_id: selectedUser,
             tenant_id: tenantId
           }
-        },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
         },
       });
 

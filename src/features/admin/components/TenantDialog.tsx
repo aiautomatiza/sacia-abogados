@@ -26,18 +26,14 @@ export function TenantDialog({ open, onOpenChange, onSuccess }: TenantDialogProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
+
       const response = await supabase.functions.invoke('manage-tenants', {
-        body: { 
+        body: {
           action: 'create',
           tenant_data: { name, email }
-        },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
         },
       });
 

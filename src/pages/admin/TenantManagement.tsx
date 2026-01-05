@@ -47,12 +47,18 @@ export default function TenantManagement() {
   const fetchTenants = async () => {
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
+
+      // Get fresh session with auto-refresh
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
+      }
+
       const response = await supabase.functions.invoke('manage-tenants', {
         body: { action: 'list' },
         headers: {
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -73,15 +79,10 @@ export default function TenantManagement() {
     if (!tenantToDelete) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('manage-tenants', {
-        body: { 
+        body: {
           action: 'delete',
           tenant_data: { id: tenantToDelete }
-        },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
         },
       });
 

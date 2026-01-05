@@ -49,13 +49,9 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
   const fetchTenants = async () => {
     try {
       setLoadingTenants(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
+
       const response = await supabase.functions.invoke('manage-tenants', {
         body: { action: 'list' },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
       });
 
       if (response.error) throw response.error;
@@ -83,7 +79,6 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
 
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
 
       const response = await supabase.functions.invoke('invite-user', {
         body: {
@@ -91,9 +86,6 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
           full_name: fullName,
           role,
           tenant_id: role === 'user_client' ? tenantId : null,
-        },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
         },
       });
 
