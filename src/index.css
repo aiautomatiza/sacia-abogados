@@ -1,0 +1,460 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AIAutomatiza Design System - Paleta de Colores del Logo
+ * Azul oscuro (primario): #054AA7
+ * Azul medio (acentos): #5970AC
+ * Azul claro (secundario): #5471F3
+ * Gris del logo: #A6A6A6
+ * Blanco: #FCFDFD
+ * Negro para letras
+ * Typography: Inter (UI) + Space Grotesk (headings)
+ */
+
+@layer base {
+  :root {
+    /* Background & Surface Colors - Clean modern light theme */
+    --background: 0 0% 99%;           /* #FCFDFD - Blanco del logo */
+    --foreground: 0 0% 0%;            /* Negro para texto */
+    
+    /* Surface colors */
+    --surface: 0 0% 97%;
+    --surface-hover: 0 0% 94%;
+
+    /* Card colors */
+    --card: 0 0% 99%;                 /* #FCFDFD - Blanco del logo */
+    --card-foreground: 0 0% 0%;       /* Negro para texto */
+
+    /* Popover colors */
+    --popover: 0 0% 99%;              /* #FCFDFD - Blanco del logo */
+    --popover-foreground: 0 0% 0%;    /* Negro para texto */
+
+    /* Primary Brand Colors - Azul Oscuro del Logo */
+    --primary: 214 94% 34%;           /* #054AA7 - Azul oscuro primario */
+    --primary-hover: 214 94% 30%;
+    --primary-foreground: 0 0% 99%;   /* #FCFDFD - Blanco */
+    --primary-light: 214 94% 90%;
+    --primary-glow: 214 94% 50%;
+
+    /* Secondary Colors - Azul Claro del Logo */
+    --secondary: 229 87% 64%;         /* #5471F3 - Azul claro secundario */
+    --secondary-hover: 229 87% 60%;
+    --secondary-foreground: 0 0% 99%; /* #FCFDFD - Blanco */
+
+    /* Muted colors - Gris del Logo */
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 65%;     /* #A6A6A6 - Gris del logo */
+
+    /* Accent colors - Azul Medio del Logo */
+    --accent: 223 33% 96%;
+    --accent-hover: 223 33% 92%;
+    --accent-foreground: 0 0% 0%;     /* Negro para texto */
+
+    /* Status colors */
+    --success: 142 71% 45%;
+    --success-dark: 142 71% 35%;
+    --success-foreground: 0 0% 99%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 99%;
+    --info: 229 87% 64%;              /* #5471F3 - Azul claro */
+    --info-foreground: 0 0% 99%;
+
+    /* Border and input colors */
+    --border: 0 0% 88%;
+    --input: 0 0% 92%;
+    --ring: 214 94% 34%;              /* #054AA7 - Azul oscuro */
+
+    /* Border radius for modern feel */
+    --radius: 12px;
+
+    /* Gradients - Usando colores del logo */
+    --gradient-primary: linear-gradient(90deg, #054AA7 0%, #5471F3 100%);
+    --gradient-subtle: linear-gradient(180deg, #FCFDFD, hsl(0, 0%, 98%));
+    --gradient-hero: linear-gradient(135deg, #054AA7 0%, #5970AC 50%, #5471F3 100%);
+
+    /* Shadows - Basadas en azul oscuro */
+    --shadow-elegant: 0 10px 30px -10px hsl(214 94% 34% / 0.3);
+    --shadow-glow: 0 0 40px hsl(214 94% 50% / 0.4);
+    --shadow-card: 0 4px 20px -4px hsl(214 94% 34% / 0.15);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Sidebar colors */
+    --sidebar-background: 0 0% 96%;
+    --sidebar-foreground: 0 0% 0%;
+    --sidebar-primary: 214 94% 34%;   /* #054AA7 */
+    --sidebar-primary-foreground: 0 0% 99%;
+    --sidebar-accent: 0 0% 92%;
+    --sidebar-accent-foreground: 0 0% 0%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 214 94% 34%;      /* #054AA7 */
+    
+    /* Sidebar dimensions */
+    --sidebar-width: 20rem;              /* 320px expandido */
+    --sidebar-collapsed-width: 5rem;     /* 80px colapsado */
+    --header-height: 4rem;               /* 64px para header */
+  }
+
+  .dark {
+    /* Dark theme con la paleta del logo */
+    --background: 0 0% 8%;
+    --foreground: 0 0% 99%;           /* #FCFDFD - Blanco del logo */
+
+    --surface: 0 0% 12%;
+    --surface-hover: 0 0% 16%;
+
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 99%;      /* #FCFDFD - Blanco del logo */
+
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 99%;   /* #FCFDFD - Blanco del logo */
+
+    --primary: 229 87% 64%;           /* #5471F3 - Azul claro (más visible en dark) */
+    --primary-hover: 229 87% 60%;
+    --primary-foreground: 0 0% 0%;    /* Negro */
+    --primary-light: 229 87% 20%;
+    --primary-glow: 229 87% 50%;
+
+    --secondary: 214 94% 50%;         /* #054AA7 más claro para dark mode */
+    --secondary-hover: 214 94% 45%;
+    --secondary-foreground: 0 0% 99%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 65%;     /* #A6A6A6 - Gris del logo */
+
+    --accent: 223 33% 20%;
+    --accent-hover: 223 33% 24%;
+    --accent-foreground: 0 0% 99%;
+
+    --success: 142 71% 45%;
+    --success-dark: 142 71% 35%;
+    --success-foreground: 0 0% 99%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 99%;
+    --info: 229 87% 64%;              /* #5471F3 */
+    --info-foreground: 0 0% 0%;
+
+    --border: 0 0% 25%;
+    --input: 0 0% 20%;
+    --ring: 229 87% 64%;              /* #5471F3 - Azul claro */
+
+    /* Dark mode gradients */
+    --gradient-primary: linear-gradient(90deg, #054AA7 0%, #5471F3 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(0, 0%, 10%), hsl(0, 0%, 12%));
+    --gradient-hero: linear-gradient(135deg, #054AA7 0%, #5970AC 50%, #5471F3 100%);
+
+    /* Dark mode shadows */
+    --shadow-elegant: 0 10px 30px -10px hsl(229 87% 64% / 0.5);
+    --shadow-glow: 0 0 40px hsl(229 87% 64% / 0.6);
+    --shadow-card: 0 4px 20px -4px hsl(229 87% 64% / 0.25);
+
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 99%;
+    --sidebar-primary: 229 87% 64%;   /* #5471F3 */
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 223 33% 20%;
+    --sidebar-accent-foreground: 0 0% 99%;
+    --sidebar-border: 0 0% 25%;
+    --sidebar-ring: 229 87% 64%;      /* #5471F3 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    overflow: hidden; /* Prevent double scrollbar: page scroll handled by main content */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+  }
+
+  /* Modern focus ring for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-background transition-all duration-200;
+  }
+
+  /* Custom scrollbar with modern styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: var(--radius);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--secondary)));
+    border-radius: var(--radius);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(45deg, hsl(var(--primary-hover)), hsl(var(--secondary-hover)));
+  }
+}
+
+@layer components {
+  /* Modern KPI Card Component */
+  .kpi-card {
+    @apply bg-surface border border-border/50 rounded-xl shadow-sm hover:shadow-card transition-all duration-300;
+    background: hsl(var(--surface));
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Enhanced Status Badge Component */
+  .status-badge {
+    @apply inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200;
+    backdrop-filter: blur(8px);
+  }
+
+  .status-citado {
+    @apply bg-success/15 text-success border border-success/30;
+    box-shadow: 0 2px 8px hsl(var(--success) / 0.2);
+  }
+
+  .status-lead {
+    @apply bg-primary/15 text-primary border border-primary/30;
+    box-shadow: 0 2px 8px hsl(var(--primary) / 0.2);
+  }
+
+  .status-cancelado {
+    @apply bg-warning/15 text-warning border border-warning/30;
+    box-shadow: 0 2px 8px hsl(var(--warning) / 0.2);
+  }
+
+  .status-no-asistido {
+    @apply bg-destructive/15 text-destructive border border-destructive/30;
+    box-shadow: 0 2px 8px hsl(var(--destructive) / 0.2);
+  }
+
+  .status-presupuestado {
+    background: hsl(223 33% 51% / 0.15);  /* Azul medio del logo */
+    color: hsl(223 33% 51%);
+    border: 1px solid hsl(223 33% 51% / 0.3);
+    box-shadow: 0 2px 8px hsl(223 33% 51% / 0.2);
+  }
+
+  .status-cerrado {
+    @apply bg-muted/15 text-muted-foreground border border-muted/30;
+    box-shadow: 0 2px 8px hsl(var(--muted) / 0.2);
+  }
+
+  /* Modern Data Table Component */
+  .data-table {
+    @apply bg-card border border-border/50 rounded-xl overflow-hidden;
+    background: hsl(var(--card));
+    backdrop-filter: blur(8px);
+  }
+
+  .data-table th {
+    @apply bg-gradient-to-r from-surface to-surface-hover font-semibold text-foreground/80 text-sm tracking-wide;
+    background: linear-gradient(90deg, hsl(var(--surface)), hsl(var(--surface-hover)));
+  }
+
+  .data-table tr:hover {
+    background: linear-gradient(90deg, hsl(214 94% 34% / 0.05), hsl(229 87% 64% / 0.05));
+    backdrop-filter: blur(4px);
+  }
+
+  /* Sticky header enhancement */
+  .data-table .sticky {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Ocultar scrollbar nativo en el header (solo queremos el del body) */
+  .data-table .sticky::-webkit-scrollbar {
+    display: none;
+  }
+
+  .data-table .sticky {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Asegurar que el ScrollBar de Radix UI sea visible */
+  .data-table [data-radix-scroll-area-viewport] {
+    scrollbar-gutter: stable;
+  }
+
+  /* Enhanced Button Variants */
+  .btn-primary {
+    background: var(--gradient-primary);
+    @apply text-primary-foreground hover:scale-105 transition-all duration-200;
+    box-shadow: var(--shadow-elegant);
+  }
+
+  .btn-primary:hover {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .btn-secondary {
+    background: hsl(var(--secondary));
+    @apply text-secondary-foreground hover:scale-105 transition-all duration-200;
+    backdrop-filter: blur(8px);
+  }
+
+  .btn-secondary:hover {
+    background: hsl(var(--secondary-hover));
+  }
+
+  .btn-outline {
+    @apply border border-border/50 bg-card hover:bg-surface transition-all duration-200;
+    background: hsl(var(--card));
+    backdrop-filter: blur(8px);
+  }
+
+  /* Modern Form Input Component */
+  .form-input {
+    background: hsl(var(--card));
+    @apply border border-input/50 rounded-xl px-4 py-3 text-sm transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary/50;
+    backdrop-filter: blur(8px);
+  }
+
+  .form-input:focus {
+    background: hsl(var(--card));
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.1);
+  }
+
+  /* Enhanced Loading Skeleton */
+  .skeleton {
+    @apply bg-gradient-to-r from-muted/30 via-muted/50 to-muted/30 animate-pulse rounded-xl;
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Modern Card Grid Layout */
+  .card-grid {
+    @apply grid gap-8 md:grid-cols-2 lg:grid-cols-3;
+  }
+
+  /* Glassmorphism Cards */
+  .glass-card {
+    background: hsl(var(--surface));
+    @apply border border-border/50 rounded-xl backdrop-blur-md;
+  }
+
+  /* Enhanced Focus Ring */
+  .focus-ring-inset {
+    @apply focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/60 transition-all duration-200;
+  }
+
+  /* Hero Gradient */
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  /* Text Gradients */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Enhanced page headers */
+  .page-header {
+    @apply mb-8 space-y-2;
+  }
+
+  .page-title {
+    @apply text-3xl font-sans text-black;
+  }
+
+  .page-description {
+    @apply text-muted-foreground text-lg;
+  }
+
+  /* Modern action bars */
+  .action-bar {
+    @apply flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6;
+  }
+
+  .action-buttons {
+    @apply flex items-center gap-3;
+  }
+}
+
+@layer utilities {
+  /* Additional animation keyframes */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.4s ease-out;
+  }
+
+  /* Personalización de scrollbar */
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
