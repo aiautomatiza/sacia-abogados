@@ -9,7 +9,9 @@
       "Bash(dir:*)",
       "Bash(wc:*)",
       "Bash(npm install:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
