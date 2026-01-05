@@ -13,20 +13,24 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Create client with user context
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
     );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
       throw new Error('User not authenticated');
@@ -35,6 +39,12 @@ Deno.serve(async (req) => {
     // Check if user is superAdmin
     await verifySuperAdmin(supabaseClient, user.id);
 
+    // Create admin client for privileged operations
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     const { action, tenant_id, settings, credentials } = await req.json();
 
     console.log('manage-tenant-settings:', { action, tenant_id, user_id: user.id });
@@ -42,7 +52,7 @@ Deno.serve(async (req) => {
     switch (action) {
       case 'get': {
         // Get tenant settings
-        const { data, error } = await supabaseClient
+        const { data, error } = await adminClient
           .from('tenant_settings')
           .select('*')
           .eq('tenant_id', tenant_id)
@@ -92,7 +102,7 @@ Deno.serve(async (req) => {
         }
 
         // Update tenant settings
-        const { data, error } = await supabaseClient
+        const { data, error } = await adminClient
           .from('tenant_settings')
           .update(settings)
           .eq('tenant_id', tenant_id)

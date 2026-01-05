@@ -174,6 +174,11 @@ serve(async (req) => {
       throw new Error('MIDDLEWARE_URL environment variable is not configured');
     }
 
+    const jwtSecret = Deno.env.get('JWT_SECRET');
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET environment variable is not configured');
+    }
+
     console.log(`[sync-contacts] Sending ${mappedContacts.length} contacts to middleware`);
 
     const response = await fetch(`${middlewareUrl}/api/sync/contacts/export`, {
@@ -181,6 +186,7 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': req.headers.get('Authorization')!,
+        'X-JWT-Secret': jwtSecret,
       },
       body: JSON.stringify({
         tenant_id,

@@ -55,18 +55,18 @@ serve(async (req) => {
     const dashboardUrl = Deno.env.get('DASHBOARD_URL') || 'http://localhost:8080';
 
     console.log(`[initiate-oauth] Calling middleware for integration: ${integration_name}, tenant: ${tenant_id}`);
+    console.log(`[initiate-oauth] User ID: ${user.id}, Email: ${user.email}`);
+
+    // Debug: Log token info (first/last 10 chars only for security)
+    const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader.replace('Bearer ', '');
+    console.log(`[initiate-oauth] Token (first 20 chars): ${token.substring(0, 20)}...`);
 
     const response = await fetch(`${middlewareUrl}/api/oauth/authorize`, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers.get('Authorization')!,
+        'Authorization': authHeader,
       },
-      body: JSON.stringify({
-        integration_name,
-        tenant_id,
-        redirect_url: `${dashboardUrl}/oauth/callback`,
-      }),
     });
 
     if (!response.ok) {

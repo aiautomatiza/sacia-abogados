@@ -11,20 +11,24 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Create client with user context
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
     );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
       throw new Error('User not authenticated');
@@ -44,6 +48,12 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Create admin client for privileged operations
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     const { action, tenant_data } = await req.json();
 
     console.log('manage-tenants:', { action, user_id: user.id });
@@ -51,7 +61,7 @@ Deno.serve(async (req) => {
     switch (action) {
       case 'list': {
         // List all tenants with user count
-        const { data: tenants, error } = await supabaseClient
+        const { data: tenants, error } = await adminClient
           .from('tenants')
           .select(`
             *,
@@ -70,7 +80,7 @@ Deno.serve(async (req) => {
 
       case 'create': {
         // Create new tenant
-        const { data: newTenant, error: tenantError } = await supabaseClient
+        const { data: newTenant, error: tenantError } = await adminClient
           .from('tenants')
           .insert(tenant_data)
           .select()
@@ -79,9 +89,9 @@ Deno.serve(async (req) => {
         if (tenantError) throw tenantError;
 
         // Create default settings
-        const { error: settingsError } = await supabaseClient
+        const { error: settingsError } = await adminClient
           .from('tenant_settings')
-          .insert({ 
+          .insert({
             tenant_id: newTenant.id,
             whatsapp_enabled: false,
             calls_enabled: false
@@ -99,7 +109,7 @@ Deno.serve(async (req) => {
 
       case 'delete': {
         // Delete tenant (CASCADE will delete everything)
-        const { error } = await supabaseClient
+        const { error } = await adminClient
           .from('tenants')
           .delete()
           .eq('id', tenant_data.id);
@@ -117,8 +127,8 @@ Deno.serve(async (req) => {
       case 'assign_user': {
         // Assign user to tenant
         const { user_id, tenant_id } = tenant_data;
-        
-        const { error } = await supabaseClient
+
+        const { error } = await adminClient
           .from('profiles')
           .update({ tenant_id })
           .eq('id', user_id);

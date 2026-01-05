@@ -14,20 +14,24 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Create client with user context
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
     );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
       throw new Error('No autenticado');
@@ -35,6 +39,12 @@ Deno.serve(async (req) => {
 
     // Verify user is super_admin
     await verifySuperAdmin(supabaseClient, user.id);
+
+    // Create admin client for privileged operations
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     const { email, full_name, role, tenant_id } = await req.json();
 
@@ -53,27 +63,27 @@ Deno.serve(async (req) => {
 
     // Verify tenant exists if provided
     if (tenant_id) {
-      const { data: tenant, error: tenantError } = await supabaseClient
+      const { data: tenant, error: tenantError } = await adminClient
         .from('tenants')
         .select('id')
         .eq('id', tenant_id)
         .single();
-      
+
       if (tenantError || !tenant) {
         throw new Error('Cliente no encontrado');
       }
     }
 
     // Check if user already exists in auth.users
-    const { data: existingUsers } = await supabaseClient.auth.admin.listUsers();
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find((u) => u.email === email);
-    
+
     if (existingUser) {
       throw new Error('Este email ya está registrado');
     }
 
     // Check if there's a pending invitation for this email
-    const { data: existingInvitation } = await supabaseClient
+    const { data: existingInvitation } = await adminClient
       .from('user_invitations')
       .select('id, status')
       .eq('email', email)
@@ -87,7 +97,7 @@ Deno.serve(async (req) => {
     console.log('Creating invitation for:', { email, full_name, role, tenant_id });
 
     // Create invitation record
-    const { data: invitation, error: invitationError } = await supabaseClient
+    const { data: invitation, error: invitationError } = await adminClient
       .from('user_invitations')
       .insert({
         email,
@@ -162,7 +172,7 @@ Deno.serve(async (req) => {
     if (emailError) {
       console.error('Error sending email:', emailError);
       // Delete invitation if email fails
-      await supabaseClient
+      await adminClient
         .from('user_invitations')
         .delete()
         .eq('id', invitation.id);
