@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.process-campaign-queue]
 verify_jwt = false
+
+[functions.initiate-oauth]
+verify_jwt = false
+
+[functions.handle-oauth-callback]
+verify_jwt = false
