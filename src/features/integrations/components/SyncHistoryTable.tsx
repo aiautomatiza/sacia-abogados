@@ -13,10 +13,11 @@ import { es } from 'date-fns/locale';
 
 interface SyncHistoryTableProps {
   integrationId?: string;
+  tenantId?: string;
 }
 
-export function SyncHistoryTable({ integrationId }: SyncHistoryTableProps) {
-  const { data, isLoading } = useSyncLogs(integrationId);
+export function SyncHistoryTable({ integrationId, tenantId }: SyncHistoryTableProps) {
+  const { data, isLoading } = useSyncLogs(integrationId, tenantId);
 
   if (isLoading) {
     return <div className="text-center py-4">Cargando historial...</div>;

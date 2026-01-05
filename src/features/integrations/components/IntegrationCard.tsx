@@ -13,9 +13,10 @@ interface IntegrationCardProps {
     last_sync_at?: string;
   };
   connected?: boolean;
+  tenantId?: string;
 }
 
-export function IntegrationCard({ integration, connected }: IntegrationCardProps) {
+export function IntegrationCard({ integration, connected, tenantId }: IntegrationCardProps) {
   const { connectIntegration, disconnect } = useIntegrationMutations();
 
   return (
@@ -51,7 +52,7 @@ export function IntegrationCard({ integration, connected }: IntegrationCardProps
           </div>
         ) : (
           <Button
-            onClick={() => connectIntegration.mutate(integration.integration_name)}
+            onClick={() => connectIntegration.mutate({ integrationName: integration.integration_name, tenantId })}
             disabled={connectIntegration.isPending}
           >
             Conectar

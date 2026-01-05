@@ -9,7 +9,8 @@ export function useIntegrationMutations() {
   const { profile } = useProfile();
 
   const connectIntegration = useMutation({
-    mutationFn: initiateOAuth,
+    mutationFn: ({ integrationName, tenantId }: { integrationName: string; tenantId?: string }) =>
+      initiateOAuth(integrationName, tenantId),
     onSuccess: (data) => {
       // Redirigir al usuario a la URL de autorización OAuth
       if (data?.authorization_url) {
