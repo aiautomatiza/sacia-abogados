@@ -126,6 +126,9 @@ serve(async (req) => {
 
     const contactData: ContactData = await req.json();
 
+    // Debug: Log incoming data
+    console.log('[create-contact] Received contact data:', JSON.stringify(contactData));
+
     if (!contactData.numero) {
       return new Response(
         JSON.stringify({ error: 'El número de teléfono es requerido' }),

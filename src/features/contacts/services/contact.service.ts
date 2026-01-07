@@ -64,14 +64,20 @@ export async function createContact(contactData: Partial<Contact>): Promise<Cont
   // Validate input with Zod
   const validated = createContactSchema.parse(contactData);
 
-  const { numero, nombre, attributes } = validated;
+  const { numero, nombre, attributes, ...customFields } = validated;
+
+  // Merge existing attributes with custom fields from form
+  const mergedAttributes = {
+    ...attributes,
+    ...customFields,
+  };
 
   // Call edge function to create contact and notify middleware
   const { data, error } = await supabase.functions.invoke('create-contact', {
     body: {
       numero,
       nombre,
-      attributes,
+      attributes: mergedAttributes,
     },
   });
 
@@ -101,12 +107,18 @@ export async function updateContact(
   // Validate input with Zod
   const validated = updateContactSchema.parse(contactData);
 
-  const { numero, nombre, attributes } = validated;
+  const { numero, nombre, attributes, ...customFields } = validated;
+
+  // Merge existing attributes with custom fields from form
+  const mergedAttributes = {
+    ...attributes,
+    ...customFields,
+  };
 
   const updates: Partial<Contact> = {};
   if (numero !== undefined) updates.numero = numero;
   if (nombre !== undefined) updates.nombre = nombre;
-  if (attributes !== undefined) updates.attributes = attributes;
+  if (Object.keys(mergedAttributes).length > 0) updates.attributes = mergedAttributes;
 
   const { data, error } = await supabase
     .from('crm_contacts')
