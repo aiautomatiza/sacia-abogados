@@ -8,6 +8,7 @@ import { z } from 'zod';
 /**
  * Schema for creating a new contact
  * Enforces required fields and validates phone number format
+ * Uses passthrough() to allow custom fields from dynamic form
  */
 export const createContactSchema = z.object({
   numero: z
@@ -24,11 +25,12 @@ export const createContactSchema = z.object({
     .record(z.unknown())
     .optional()
     .default({}),
-});
+}).passthrough(); // Allow custom fields to pass through
 
 /**
  * Schema for updating an existing contact
  * All fields are optional for partial updates
+ * Uses passthrough() to allow custom fields from dynamic form
  */
 export const updateContactSchema = z.object({
   numero: z
@@ -46,7 +48,8 @@ export const updateContactSchema = z.object({
   attributes: z
     .record(z.unknown())
     .optional(),
-}).refine(
+}).passthrough() // Allow custom fields to pass through
+.refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided for update' }
 );
