@@ -1,13 +1,13 @@
 project_id = "voolvfxtegcebfvsdijz"
 
 [functions.create-contact]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-contact-from-external]
 verify_jwt = false
 
 [functions.import-contacts]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-campaign]
 verify_jwt = true
