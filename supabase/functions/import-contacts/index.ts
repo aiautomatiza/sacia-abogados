@@ -221,19 +221,26 @@ Deno.serve(async (req) => {
               const syncPromises = createdContacts.map(async (contact) => {
                 const attributes = contact.attributes || {};
 
+                // Validate email exists (required by middleware)
+                const email = attributes.email || attributes.Email || '';
+                if (!email || email.trim() === '') {
+                  console.warn(`[import-contacts] Contact ${contact.numero} has no email, skipping middleware sync`);
+                  return { success: false, contact: contact.numero, reason: 'No email' };
+                }
+
                 // Build middleware payload
                 const middlewarePayload: any = {
                   name: contact.nombre || 'Sin nombre',
-                  email: attributes.email || '', // Email is required by middleware
+                  email: email.trim(),
                   phone: contact.numero,
                 };
 
                 // Add optional fields if present
-                if (attributes.company) {
-                  middlewarePayload.company = attributes.company;
+                if (attributes.company || attributes.Company) {
+                  middlewarePayload.company = attributes.company || attributes.Company;
                 }
-                if (attributes.notes) {
-                  middlewarePayload.notes = attributes.notes;
+                if (attributes.notes || attributes.Notes) {
+                  middlewarePayload.notes = attributes.notes || attributes.Notes;
                 }
 
                 try {

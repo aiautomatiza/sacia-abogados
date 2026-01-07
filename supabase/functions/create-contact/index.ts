@@ -203,38 +203,51 @@ serve(async (req) => {
             // Extract fields from contact attributes
             const attributes = newContact.attributes || {};
 
-            // Build middleware payload
-            const middlewarePayload: any = {
-              name: newContact.nombre || 'Sin nombre',
-              email: attributes.email || '', // Email is required by middleware
-              phone: newContact.numero,
-            };
+            // Debug logging
+            console.log('[create-contact] Contact attributes:', JSON.stringify(attributes));
 
-            // Add optional fields if present
-            if (attributes.company) {
-              middlewarePayload.company = attributes.company;
-            }
-            if (attributes.notes) {
-              middlewarePayload.notes = attributes.notes;
-            }
-
-            const middlewareResponse = await fetch(`${middlewareUrl}/api/sync/contact`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': req.headers.get('Authorization')!,
-              },
-              body: JSON.stringify(middlewarePayload),
-            });
-
-            if (!middlewareResponse.ok) {
-              const errorText = await middlewareResponse.text();
-              console.error(`[create-contact] Middleware notification failed: ${middlewareResponse.status} - ${errorText}`);
-              // No fallar la creación del contacto si el middleware falla
-              // El contacto ya fue creado exitosamente
+            // Validate email exists (required by middleware)
+            const email = attributes.email || attributes.Email || '';
+            if (!email || email.trim() === '') {
+              console.warn('[create-contact] Contact has no email, skipping middleware sync');
+              // Don't sync to middleware if no email (required field)
             } else {
-              const result = await middlewareResponse.json();
-              console.log('[create-contact] Middleware notified successfully:', result);
+              // Build middleware payload
+              const middlewarePayload: any = {
+                name: newContact.nombre || 'Sin nombre',
+                email: email.trim(),
+                phone: newContact.numero,
+              };
+
+              // Add optional fields if present
+              if (attributes.company || attributes.Company) {
+                middlewarePayload.company = attributes.company || attributes.Company;
+              }
+              if (attributes.notes || attributes.Notes) {
+                middlewarePayload.notes = attributes.notes || attributes.Notes;
+              }
+
+              // Debug logging
+              console.log('[create-contact] Middleware payload:', JSON.stringify(middlewarePayload));
+
+              const middlewareResponse = await fetch(`${middlewareUrl}/api/sync/contact`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': req.headers.get('Authorization')!,
+                },
+                body: JSON.stringify(middlewarePayload),
+              });
+
+              if (!middlewareResponse.ok) {
+                const errorText = await middlewareResponse.text();
+                console.error(`[create-contact] Middleware notification failed: ${middlewareResponse.status} - ${errorText}`);
+                // No fallar la creación del contacto si el middleware falla
+                // El contacto ya fue creado exitosamente
+              } else {
+                const result = await middlewareResponse.json();
+                console.log('[create-contact] Middleware notified successfully:', result);
+              }
             }
           } catch (middlewareError) {
             console.error('[create-contact] Error notifying middleware:', middlewareError);
