@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { IntegrationStatusBadge } from './IntegrationStatusBadge';
 import { SyncButton } from './SyncButton';
 import { useIntegrationMutations } from '../hooks/useIntegrationMutations';
+import { getIntegrationConfig } from '../constants/integration-config';
 
 interface IntegrationCardProps {
   integration: {
@@ -18,14 +19,34 @@ interface IntegrationCardProps {
 
 export function IntegrationCard({ integration, connected, tenantId }: IntegrationCardProps) {
   const { connectIntegration, disconnect } = useIntegrationMutations();
+  const config = getIntegrationConfig(integration.integration_name);
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="capitalize">{integration.integration_name}</CardTitle>
-            <CardDescription className="capitalize">{integration.integration_type}</CardDescription>
+          <div className="flex items-center gap-3">
+            {config?.logo && (
+              <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg border border-gray-200 p-2 flex-shrink-0">
+                <img
+                  src={config.logo}
+                  alt={`${config.displayName} logo`}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    // Fallback si la imagen no carga
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            <div>
+              <CardTitle className="capitalize">
+                {config?.displayName || integration.integration_name}
+              </CardTitle>
+              <CardDescription>
+                {config?.description || integration.integration_type}
+              </CardDescription>
+            </div>
           </div>
           {connected && <IntegrationStatusBadge status={integration.status} />}
         </div>

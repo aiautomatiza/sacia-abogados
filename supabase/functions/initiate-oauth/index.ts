@@ -62,7 +62,17 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     console.log(`[initiate-oauth] Token (first 20 chars): ${token.substring(0, 20)}...`);
 
-    const response = await fetch(`${middlewareUrl}/api/oauth/authorize`, {
+    // Construir URL con query parameters
+    const params = new URLSearchParams({
+      integration_name: integration_name,
+      tenant_id: tenant_id,
+      redirect_url: `${dashboardUrl}/oauth/callback`,
+    });
+
+    const middlewareRequestUrl = `${middlewareUrl}/api/oauth/authorize?${params.toString()}`;
+    console.log(`[initiate-oauth] Requesting: ${middlewareRequestUrl}`);
+
+    const response = await fetch(middlewareRequestUrl, {
       method: 'GET',
       headers: {
         'Authorization': authHeader,

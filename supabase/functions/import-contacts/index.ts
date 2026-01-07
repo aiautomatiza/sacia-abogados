@@ -20,17 +20,17 @@ interface Contact {
 function normalizeSpanishPhone(phone: string): string {
   // 1. Limpiar: eliminar espacios, guiones, paréntesis
   let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-  
+
   // 2. Si ya tiene prefijo +34, normalizar y retornar
   if (cleaned.startsWith('+34')) {
     return cleaned;
   }
-  
+
   // 3. Si tiene prefijo 0034, convertir a +34
   if (cleaned.startsWith('0034')) {
     return '+34' + cleaned.slice(4);
   }
-  
+
   // 4. Si tiene prefijo 34 (sin +) y el resto son 9 dígitos válidos
   if (cleaned.startsWith('34') && cleaned.length === 11) {
     const withoutPrefix = cleaned.slice(2);
@@ -38,14 +38,43 @@ function normalizeSpanishPhone(phone: string): string {
       return '+34' + withoutPrefix;
     }
   }
-  
+
   // 5. Si es un número español de 9 dígitos (empieza por 6, 7, 8 o 9)
   if (/^[6789]\d{8}$/.test(cleaned)) {
     return '+34' + cleaned;
   }
-  
+
   // 6. Si no coincide con patrón español, retornar limpio (puede ser internacional)
   return cleaned.startsWith('+') ? cleaned : cleaned;
+}
+
+/**
+ * Verifica si el tenant tiene integraciones activas
+ */
+async function checkActiveIntegrations(tenantId: string): Promise<boolean> {
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data, error } = await supabaseAdmin
+      .from('integration_credentials')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .limit(1);
+
+    if (error) {
+      console.error('[import-contacts] Error checking integrations:', error);
+      return false;
+    }
+
+    return (data?.length ?? 0) > 0;
+  } catch (error) {
+    console.error('[import-contacts] Unexpected error checking integrations:', error);
+    return false;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -169,6 +198,60 @@ Deno.serve(async (req) => {
 
     const total = created + updated;
     console.log(`Importación completada: ${created} creados, ${updated} actualizados`);
+
+    // Notify middleware if tenant has active integrations and contacts were created
+    if (created > 0) {
+      const hasActiveIntegrations = await checkActiveIntegrations(profile.tenant_id);
+
+      if (hasActiveIntegrations) {
+        const middlewareUrl = Deno.env.get('MIDDLEWARE_URL');
+        const jwtSecret = Deno.env.get('JWT_SECRET');
+
+        if (middlewareUrl && jwtSecret) {
+          try {
+            // Get the created contacts data
+            const { data: createdContacts } = await supabaseClient
+              .from('crm_contacts')
+              .select('*')
+              .in('id', contactIds.slice(0, created)); // Only newly created ones
+
+            if (createdContacts && createdContacts.length > 0) {
+              console.log(`[import-contacts] Notifying middleware about ${createdContacts.length} new contacts`);
+
+              const middlewareResponse = await fetch(`${middlewareUrl}/api/contacts/bulk_imported`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': req.headers.get('Authorization')!,
+                  'X-JWT-Secret': jwtSecret,
+                },
+                body: JSON.stringify({
+                  tenant_id: profile.tenant_id,
+                  contacts: createdContacts.map(c => ({
+                    id: c.id,
+                    numero: c.numero,
+                    nombre: c.nombre,
+                    attributes: c.attributes,
+                    created_at: c.created_at,
+                  })),
+                }),
+              });
+
+              if (!middlewareResponse.ok) {
+                const errorText = await middlewareResponse.text();
+                console.error(`[import-contacts] Middleware notification failed: ${middlewareResponse.status} - ${errorText}`);
+                // Don't fail the import if middleware fails
+              } else {
+                console.log('[import-contacts] Middleware notified successfully');
+              }
+            }
+          } catch (middlewareError) {
+            console.error('[import-contacts] Error notifying middleware:', middlewareError);
+            // Don't fail the import if middleware fails
+          }
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify({

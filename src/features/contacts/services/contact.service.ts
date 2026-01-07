@@ -64,33 +64,32 @@ export async function createContact(contactData: Partial<Contact>): Promise<Cont
   // Validate input with Zod
   const validated = createContactSchema.parse(contactData);
 
-  // Centralized tenant_id lookup
-  const tenantId = await getCurrentTenantId();
-
   const { numero, nombre, attributes } = validated;
 
-  const { data, error } = await supabase
-    .from('crm_contacts')
-    .insert({
-      tenant_id: tenantId,
+  // Call edge function to create contact and notify middleware
+  const { data, error } = await supabase.functions.invoke('create-contact', {
+    body: {
       numero,
       nombre,
       attributes,
-    })
-    .select()
-    .single();
+    },
+  });
 
   if (error) {
-    // Handle unique constraint violation
-    if (error.code === '23505') {
-      throw new Error(`Contact with phone number ${numero} already exists`);
-    }
     throw new Error(`Failed to create contact: ${error.message}`);
   }
 
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  if (!data?.contact) {
+    throw new Error('Failed to create contact: Invalid response from server');
+  }
+
   return {
-    ...data,
-    attributes: (data.attributes as Record<string, unknown>) || {},
+    ...data.contact,
+    attributes: (data.contact.attributes as Record<string, unknown>) || {},
   };
 }
 
