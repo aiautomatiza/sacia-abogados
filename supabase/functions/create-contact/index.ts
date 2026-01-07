@@ -195,29 +195,36 @@ serve(async (req) => {
 
       if (hasActiveIntegrations) {
         const middlewareUrl = Deno.env.get('MIDDLEWARE_URL');
-        const jwtSecret = Deno.env.get('JWT_SECRET');
 
-        if (middlewareUrl && jwtSecret) {
+        if (middlewareUrl) {
           try {
             console.log(`[create-contact] Notifying middleware at ${middlewareUrl}`);
 
-            const middlewareResponse = await fetch(`${middlewareUrl}/api/contacts/created`, {
+            // Extract fields from contact attributes
+            const attributes = newContact.attributes || {};
+
+            // Build middleware payload
+            const middlewarePayload: any = {
+              name: newContact.nombre || 'Sin nombre',
+              email: attributes.email || '', // Email is required by middleware
+              phone: newContact.numero,
+            };
+
+            // Add optional fields if present
+            if (attributes.company) {
+              middlewarePayload.company = attributes.company;
+            }
+            if (attributes.notes) {
+              middlewarePayload.notes = attributes.notes;
+            }
+
+            const middlewareResponse = await fetch(`${middlewareUrl}/api/sync/contact`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': req.headers.get('Authorization')!,
-                'X-JWT-Secret': jwtSecret,
               },
-              body: JSON.stringify({
-                tenant_id: profile.tenant_id,
-                contact: {
-                  id: newContact.id,
-                  numero: newContact.numero,
-                  nombre: newContact.nombre,
-                  attributes: newContact.attributes,
-                  created_at: newContact.created_at,
-                },
-              }),
+              body: JSON.stringify(middlewarePayload),
             });
 
             if (!middlewareResponse.ok) {
@@ -226,14 +233,15 @@ serve(async (req) => {
               // No fallar la creación del contacto si el middleware falla
               // El contacto ya fue creado exitosamente
             } else {
-              console.log('[create-contact] Middleware notified successfully');
+              const result = await middlewareResponse.json();
+              console.log('[create-contact] Middleware notified successfully:', result);
             }
           } catch (middlewareError) {
             console.error('[create-contact] Error notifying middleware:', middlewareError);
             // No fallar la creación del contacto si el middleware falla
           }
         } else {
-          console.warn('[create-contact] Middleware URL or JWT Secret not configured, skipping notification');
+          console.warn('[create-contact] Middleware URL not configured, skipping notification');
         }
       } else {
         console.log('[create-contact] No active integrations for tenant, skipping middleware notification');

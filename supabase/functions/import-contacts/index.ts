@@ -205,9 +205,8 @@ Deno.serve(async (req) => {
 
       if (hasActiveIntegrations) {
         const middlewareUrl = Deno.env.get('MIDDLEWARE_URL');
-        const jwtSecret = Deno.env.get('JWT_SECRET');
 
-        if (middlewareUrl && jwtSecret) {
+        if (middlewareUrl) {
           try {
             // Get the created contacts data
             const { data: createdContacts } = await supabaseClient
@@ -218,32 +217,54 @@ Deno.serve(async (req) => {
             if (createdContacts && createdContacts.length > 0) {
               console.log(`[import-contacts] Notifying middleware about ${createdContacts.length} new contacts`);
 
-              const middlewareResponse = await fetch(`${middlewareUrl}/api/contacts/bulk_imported`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': req.headers.get('Authorization')!,
-                  'X-JWT-Secret': jwtSecret,
-                },
-                body: JSON.stringify({
-                  tenant_id: profile.tenant_id,
-                  contacts: createdContacts.map(c => ({
-                    id: c.id,
-                    numero: c.numero,
-                    nombre: c.nombre,
-                    attributes: c.attributes,
-                    created_at: c.created_at,
-                  })),
-                }),
+              // Send contacts to middleware one by one (in parallel)
+              const syncPromises = createdContacts.map(async (contact) => {
+                const attributes = contact.attributes || {};
+
+                // Build middleware payload
+                const middlewarePayload: any = {
+                  name: contact.nombre || 'Sin nombre',
+                  email: attributes.email || '', // Email is required by middleware
+                  phone: contact.numero,
+                };
+
+                // Add optional fields if present
+                if (attributes.company) {
+                  middlewarePayload.company = attributes.company;
+                }
+                if (attributes.notes) {
+                  middlewarePayload.notes = attributes.notes;
+                }
+
+                try {
+                  const response = await fetch(`${middlewareUrl}/api/sync/contact`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': req.headers.get('Authorization')!,
+                    },
+                    body: JSON.stringify(middlewarePayload),
+                  });
+
+                  if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[import-contacts] Failed to sync contact ${contact.numero}: ${response.status} - ${errorText}`);
+                    return { success: false, contact: contact.numero };
+                  }
+
+                  const result = await response.json();
+                  console.log(`[import-contacts] Contact ${contact.numero} synced:`, result);
+                  return { success: true, contact: contact.numero };
+                } catch (error) {
+                  console.error(`[import-contacts] Error syncing contact ${contact.numero}:`, error);
+                  return { success: false, contact: contact.numero };
+                }
               });
 
-              if (!middlewareResponse.ok) {
-                const errorText = await middlewareResponse.text();
-                console.error(`[import-contacts] Middleware notification failed: ${middlewareResponse.status} - ${errorText}`);
-                // Don't fail the import if middleware fails
-              } else {
-                console.log('[import-contacts] Middleware notified successfully');
-              }
+              const results = await Promise.all(syncPromises);
+              const successful = results.filter(r => r.success).length;
+              const failed = results.filter(r => !r.success).length;
+              console.log(`[import-contacts] Middleware sync completed: ${successful} successful, ${failed} failed`);
             }
           } catch (middlewareError) {
             console.error('[import-contacts] Error notifying middleware:', middlewareError);
