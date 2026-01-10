@@ -1,5 +1,9 @@
 project_id = "voolvfxtegcebfvsdijz"
 
+# API Gateway (Phase 0+)
+[functions.api-gateway]
+verify_jwt = false  # Manual JWT verification in auth middleware
+
 [functions.create-contact]
 verify_jwt = false
 

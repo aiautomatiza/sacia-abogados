@@ -1,8 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { initiateOAuth, disconnectIntegration, updateSyncSettings } from '../services/integration.service';
+import * as integrationsApi from '@/lib/api/endpoints/integrations.api';
 import { useProfile } from '@/hooks/useProfile';
 import type { UpdateSyncSettingsParams } from '../types';
+
+const USE_API_GATEWAY = import.meta.env.VITE_USE_API_GATEWAY === 'true';
 
 export function useIntegrationMutations() {
   const queryClient = useQueryClient();
@@ -25,7 +28,15 @@ export function useIntegrationMutations() {
   });
 
   const disconnect = useMutation({
-    mutationFn: disconnectIntegration,
+    mutationFn: async (integrationId: string) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return integrationsApi.disconnectIntegration(integrationId);
+      } else {
+        // OLD: Direct Supabase
+        return disconnectIntegration(integrationId);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations', profile?.tenant_id] });
       queryClient.invalidateQueries({ queryKey: ['sync-logs', profile?.tenant_id] });
@@ -37,8 +48,15 @@ export function useIntegrationMutations() {
   });
 
   const updateSettings = useMutation({
-    mutationFn: ({ integrationId, settings }: { integrationId: string; settings: UpdateSyncSettingsParams }) =>
-      updateSyncSettings(integrationId, settings),
+    mutationFn: async ({ integrationId, settings }: { integrationId: string; settings: UpdateSyncSettingsParams }) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return integrationsApi.updateSyncSettings(integrationId, settings);
+      } else {
+        // OLD: Direct Supabase
+        return updateSyncSettings(integrationId, settings);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations', profile?.tenant_id] });
       toast.success('Configuración actualizada correctamente');

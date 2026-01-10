@@ -13,7 +13,10 @@ import {
   assignConversation,
   deleteConversation,
 } from '../services/conversation.service';
+import * as conversationsApi from '@/lib/api/endpoints/conversations.api';
 import type { ConversationStatus, ConversationWithContact } from '../types';
+
+const USE_API_GATEWAY = import.meta.env.VITE_USE_API_GATEWAY === 'true';
 
 export function useConversationMutations() {
   const queryClient = useQueryClient();
@@ -21,9 +24,15 @@ export function useConversationMutations() {
 
   // Archive conversation with optimistic update
   const archiveMutation = useMutation({
-    mutationFn: (conversationId: string) => {
-      if (!scope) throw new Error('User scope not available');
-      return updateConversationStatus(conversationId, 'archived', scope);
+    mutationFn: async (conversationId: string) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return conversationsApi.updateConversation(conversationId, { status: 'archived' });
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) throw new Error('User scope not available');
+        return updateConversationStatus(conversationId, 'archived', scope);
+      }
     },
     onMutate: async (conversationId) => {
       const queryKey = ['conversations', 'infinite', scope?.tenantId];
@@ -76,9 +85,15 @@ export function useConversationMutations() {
 
   // Update tags with optimistic update
   const updateTagsMutation = useMutation({
-    mutationFn: ({ conversationId, tags }: { conversationId: string; tags: string[] }) => {
-      if (!scope) throw new Error('User scope not available');
-      return updateConversationTags(conversationId, tags, scope);
+    mutationFn: async ({ conversationId, tags }: { conversationId: string; tags: string[] }) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return conversationsApi.updateConversation(conversationId, { tags });
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) throw new Error('User scope not available');
+        return updateConversationTags(conversationId, tags, scope);
+      }
     },
     onMutate: async ({ conversationId, tags }) => {
       const queryKey = ['conversations', 'infinite', scope?.tenantId];
@@ -123,9 +138,15 @@ export function useConversationMutations() {
 
   // Assign conversation with optimistic update
   const assignMutation = useMutation({
-    mutationFn: ({ conversationId, userId }: { conversationId: string; userId: string | null }) => {
-      if (!scope) throw new Error('User scope not available');
-      return assignConversation(conversationId, userId, scope);
+    mutationFn: async ({ conversationId, userId }: { conversationId: string; userId: string | null }) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return conversationsApi.updateConversation(conversationId, { assigned_to: userId });
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) throw new Error('User scope not available');
+        return assignConversation(conversationId, userId, scope);
+      }
     },
     onMutate: async ({ conversationId, userId }) => {
       const queryKey = ['conversations', 'infinite', scope?.tenantId];
@@ -170,9 +191,15 @@ export function useConversationMutations() {
 
   // Delete conversation with optimistic update
   const deleteMutation = useMutation({
-    mutationFn: (conversationId: string) => {
-      if (!scope) throw new Error('User scope not available');
-      return deleteConversation(conversationId, scope);
+    mutationFn: async (conversationId: string) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return conversationsApi.deleteConversation(conversationId);
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) throw new Error('User scope not available');
+        return deleteConversation(conversationId, scope);
+      }
     },
     onMutate: async (conversationId) => {
       const queryKey = ['conversations', 'infinite', scope?.tenantId];

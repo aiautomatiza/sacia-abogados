@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import * as adminService from '@/features/admin/services/admin.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,14 +50,9 @@ export default function TenantSettings() {
     const fetchSettings = async () => {
       try {
         setLoading(true);
-
-        const response = await supabase.functions.invoke('manage-tenant-settings', {
-          body: { action: 'get', tenant_id: id },
-        });
-
-        if (response.error) throw response.error;
-        if (response.data) {
-          setSettings(response.data);
+        const data = await adminService.getTenantSettings(id!);
+        if (data) {
+          setSettings(data);
         }
       } catch (error: any) {
         toast.error('Error al cargar configuración: ' + error.message);
@@ -130,25 +125,18 @@ export default function TenantSettings() {
         return;
       }
 
-      const body: any = {
-        action: 'update',
-        tenant_id: id,
-        settings
-      };
+      // Build update payload
+      const updatePayload: any = { ...settings };
 
       // Only send credentials if they were updated (not empty)
       if (credentials.whatsapp || credentials.calls || credentials.conversations) {
-        body.credentials = {};
-        if (credentials.whatsapp) body.credentials.whatsapp = credentials.whatsapp;
-        if (credentials.calls) body.credentials.calls = credentials.calls;
-        if (credentials.conversations) body.credentials.conversations = credentials.conversations;
+        updatePayload.credentials = {};
+        if (credentials.whatsapp) updatePayload.credentials.whatsapp = credentials.whatsapp;
+        if (credentials.calls) updatePayload.credentials.calls = credentials.calls;
+        if (credentials.conversations) updatePayload.credentials.conversations = credentials.conversations;
       }
 
-      const response = await supabase.functions.invoke('manage-tenant-settings', {
-        body,
-      });
-
-      if (response.error) throw response.error;
+      await adminService.updateTenantSettings(id!, updatePayload);
 
       toast.success('Configuración guardada correctamente');
 

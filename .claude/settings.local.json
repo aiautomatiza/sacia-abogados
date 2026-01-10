@@ -11,7 +11,14 @@
       "Bash(npm install:*)",
       "Bash(npm run build:*)",
       "Bash(supabase functions deploy:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(supabase functions logs:*)",
+      "Bash(supabase --version:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(npm run type-check:*)"
     ],
     "deny": [],
     "ask": []

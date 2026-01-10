@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import * as adminService from '@/features/admin/services/admin.service';
 import { Button } from '@/components/ui/button';
 import { Plus, Settings, Trash2, Mail, FileText, Hash } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -47,23 +47,8 @@ export default function TenantManagement() {
   const fetchTenants = async () => {
     try {
       setLoading(true);
-
-      // Get fresh session with auto-refresh
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !session) {
-        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
-      }
-
-      const response = await supabase.functions.invoke('manage-tenants', {
-        body: { action: 'list' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.error) throw response.error;
-      setTenants(response.data || []);
+      const data = await adminService.listTenants();
+      setTenants(data || []);
     } catch (error: any) {
       toast.error('Error al cargar clientes: ' + error.message);
     } finally {
@@ -79,15 +64,7 @@ export default function TenantManagement() {
     if (!tenantToDelete) return;
 
     try {
-      const response = await supabase.functions.invoke('manage-tenants', {
-        body: {
-          action: 'delete',
-          tenant_data: { id: tenantToDelete }
-        },
-      });
-
-      if (response.error) throw response.error;
-
+      await adminService.deleteTenant(tenantToDelete);
       toast.success('Cliente eliminado correctamente');
       fetchTenants();
     } catch (error: any) {

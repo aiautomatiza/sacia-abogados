@@ -1,8 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as contactService from '../services/contact.service';
+import * as contactsApi from '@/lib/api/endpoints/contacts.api';
 import type { Contact, ContactFilters } from '../types';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
+
+const USE_API_GATEWAY = import.meta.env.VITE_USE_API_GATEWAY === 'true';
 
 export function useContacts(
   filters: ContactFilters = {},
@@ -11,7 +14,23 @@ export function useContacts(
 ) {
   return useQuery({
     queryKey: ['contacts', filters, page, pageSize],
-    queryFn: () => contactService.getContacts(filters, page, pageSize),
+    queryFn: async () => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        const response = await contactsApi.getContacts({
+          search: filters.search,
+          page,
+          pageSize
+        });
+        return {
+          data: response.data,
+          total: response.meta.total,
+        };
+      } else {
+        // OLD: Direct Supabase
+        return contactService.getContacts(filters, page, pageSize);
+      }
+    },
   });
 }
 
@@ -20,13 +39,19 @@ export function useContact(id: string) {
 
   return useQuery({
     queryKey: ['contact', id],
-    queryFn: () => {
-      if (!scope) {
-        throw new Error('User scope not available');
+    queryFn: async () => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return contactsApi.getContact(id);
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) {
+          throw new Error('User scope not available');
+        }
+        return contactService.getContact(id, scope);
       }
-      return contactService.getContact(id, scope);
     },
-    enabled: !!id && !!scope,
+    enabled: !!id && (USE_API_GATEWAY ? true : !!scope),
   });
 }
 
@@ -35,7 +60,19 @@ export function useContactMutations() {
   const { scope } = useAuth();
 
   const createContact = useMutation({
-    mutationFn: (data: Partial<Contact>) => contactService.createContact(data),
+    mutationFn: async (data: Partial<Contact>) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return contactsApi.createContact({
+          numero: data.numero!,
+          nombre: data.nombre,
+          attributes: data.attributes,
+        });
+      } else {
+        // OLD: Direct Supabase
+        return contactService.createContact(data);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       toast.success('Contacto creado exitosamente');
@@ -46,11 +83,21 @@ export function useContactMutations() {
   });
 
   const updateContact = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Contact> }) => {
-      if (!scope) {
-        throw new Error('User scope not available');
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Contact> }) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return contactsApi.updateContact(id, {
+          numero: data.numero,
+          nombre: data.nombre,
+          attributes: data.attributes,
+        });
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) {
+          throw new Error('User scope not available');
+        }
+        return contactService.updateContact(id, data, scope);
       }
-      return contactService.updateContact(id, data, scope);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
@@ -63,11 +110,17 @@ export function useContactMutations() {
   });
 
   const deleteContact = useMutation({
-    mutationFn: (id: string) => {
-      if (!scope) {
-        throw new Error('User scope not available');
+    mutationFn: async (id: string) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return contactsApi.deleteContact(id);
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) {
+          throw new Error('User scope not available');
+        }
+        return contactService.deleteContact(id, scope);
       }
-      return contactService.deleteContact(id, scope);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
@@ -79,11 +132,17 @@ export function useContactMutations() {
   });
 
   const deleteContactsBulk = useMutation({
-    mutationFn: (ids: string[]) => {
-      if (!scope) {
-        throw new Error('User scope not available');
+    mutationFn: async (ids: string[]) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return contactsApi.deleteContactsBulk(ids);
+      } else {
+        // OLD: Direct Supabase
+        if (!scope) {
+          throw new Error('User scope not available');
+        }
+        return contactService.deleteContactsBulk(ids, scope);
       }
-      return contactService.deleteContactsBulk(ids, scope);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
