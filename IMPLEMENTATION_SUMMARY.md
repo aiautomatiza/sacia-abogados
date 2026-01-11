@@ -447,9 +447,8 @@ SUPABASE_URL=https://voolvfxtegcebfvsdijz.supabase.co
 
 ## Documentación Adicional
 
-- **Arquitectura completa:** Ver `CONTACT_SYNC_ARCHITECTURE.md`
-- **Instrucciones n8n:** Ver sección "Ejemplo de Configuración n8n" en arquitectura
 - **Troubleshooting:** Ver logs en Supabase Dashboard → Edge Functions
+- **API Middleware:** Ver `MIDDLEWARE_API.md` para detalles de integración OAuth
 
 ---
 
@@ -458,7 +457,6 @@ SUPABASE_URL=https://voolvfxtegcebfvsdijz.supabase.co
 ### Archivos Nuevos
 - ✅ `supabase/migrations/20260107_add_contact_sync_indexes.sql`
 - ✅ `supabase/functions/sync-contact-from-external/index.ts`
-- ✅ `CONTACT_SYNC_ARCHITECTURE.md`
 - ✅ `IMPLEMENTATION_SUMMARY.md`
 
 ### Archivos Modificados
@@ -491,7 +489,7 @@ SUPABASE_URL=https://voolvfxtegcebfvsdijz.supabase.co
 
 Para dudas sobre la implementación, revisar:
 1. Logs de edge functions en Supabase Dashboard
-2. `CONTACT_SYNC_ARCHITECTURE.md` para detalles arquitectónicos
+2. Este documento (`IMPLEMENTATION_SUMMARY.md`) para detalles arquitectónicos
 3. Código fuente con comentarios inline
 
 **¡Implementación completada exitosamente! 🎉**

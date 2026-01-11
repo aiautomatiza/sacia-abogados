@@ -156,9 +156,8 @@ Status: 401
 ✅ src/features/contacts/hooks/useContacts.ts (MODIFICADO - dual-path añadido)
 ```
 
-#### Documentación y Scripts
+#### Scripts de Testing
 ```
-✅ docs/FASE-2-TESTING.md (NUEVO)
 ✅ scripts/test-contacts-api.sh (NUEVO)
 ```
 
@@ -270,9 +269,8 @@ Tests incluidos:
 ### Tests Manuales (UI)
 ```
 ⏳ Pendiente: Activar feature flag y probar en UI
-✅ Guía completa: docs/FASE-2-TESTING.md
 
-Checklist incluye:
+Checklist de testing recomendado:
 - Crear contacto (UI)
 - Editar contacto (UI)
 - Eliminar contacto (UI)
