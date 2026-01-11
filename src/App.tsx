@@ -81,7 +81,6 @@ const App = () => (
             }>
             <Route path="/" element={<Navigate to="/contacts" replace />} />
               <Route path="/conversations" element={<Conversations />} />
-              <Route path="/conversations/:conversationId" element={<Conversations />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/contacts/settings" element={<ContactSettings />} />
               <Route path="/campaigns" element={<Campaigns />} />

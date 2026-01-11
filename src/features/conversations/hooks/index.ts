@@ -12,3 +12,4 @@ export type { UseAudioRecorderReturn } from './useAudioRecorder';
 export { useWhatsAppTemplates } from './useWhatsAppTemplates';
 export { useAudioConverter } from './useAudioConverter';
 export { useSignedUrl } from './useSignedUrl';
+export { useConversationsUrlState } from './useConversationsUrlState';

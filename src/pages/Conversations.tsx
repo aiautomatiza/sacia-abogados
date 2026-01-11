@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import {
   ConversationsPage,
   useInfiniteConversations,
@@ -13,6 +12,7 @@ import {
   assignConversation,
   createConversation,
   markAsRead,
+  useConversationsUrlState,
 } from "@/features/conversations";
 import { useContacts } from "@/features/contacts";
 import { updateContact } from "@/features/contacts/services/contact.service";
@@ -36,12 +36,11 @@ const toServiceFilters = (filters: LocalConversationFilters): ConversationFilter
 };
 
 export default function Conversations() {
-  const { conversationId } = useParams<{ conversationId?: string }>();
-  const navigate = useNavigate();
+  const { urlConversationId, setUrlConversationId } = useConversationsUrlState();
   const { user, scope } = useAuth();
   const { tenantId } = useProfile();
   const { data: contactsData } = useContacts({}, 1);
-  
+
   const { filters: storedFilters, setFilters: setStoredFilters } = useConversationsFilters();
   const { uploadFile } = useFileUpload();
   const { archiveConversation } = useConversationActions();
@@ -76,16 +75,12 @@ export default function Conversations() {
 
   // Handle conversation selection - update URL and mark as read
   const handleConversationSelect = useCallback((id: string | null) => {
+    setUrlConversationId(id);
     if (id && scope) {
-      navigate(`/conversations/${id}`, { replace: true });
       // Marcar como leída inmediatamente (estilo WhatsApp)
       markAsRead(id, scope).catch(console.error);
-    } else if (id) {
-      navigate(`/conversations/${id}`, { replace: true });
-    } else {
-      navigate('/conversations', { replace: true });
     }
-  }, [navigate, scope]);
+  }, [setUrlConversationId, scope]);
 
   // Adapter for infinite conversations hook
   const useInfiniteConversationsAdapter = (params: any) => {
@@ -129,7 +124,7 @@ export default function Conversations() {
       useRealtimeConversations={useRealtimeConversations}
       initialFilters={filters}
       onFiltersChange={setFilters}
-      selectedConversationId={conversationId || null}
+      selectedConversationId={urlConversationId}
       onConversationSelect={handleConversationSelect}
       onUploadFile={handleUploadFile}
       onUpdateContact={async (id, updates) => {

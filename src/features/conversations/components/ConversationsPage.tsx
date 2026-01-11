@@ -189,7 +189,7 @@ export function ConversationsPage({
   };
 
   return (
-    <div className="flex h-full bg-background overflow-hidden">
+    <div className="relative flex h-full bg-background overflow-hidden">
       <ResizablePanelGroup
         direction="horizontal"
         onLayout={handleLayoutChange}
@@ -289,7 +289,7 @@ export function ConversationsPage({
 
       {/* Loading Overlay */}
       {isLoadingConversations && conversations.length === 0 && (
-        <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Cargando conversaciones...</p>
