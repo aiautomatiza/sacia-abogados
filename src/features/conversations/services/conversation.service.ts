@@ -442,13 +442,28 @@ export const createConversation = async (
 
 export const listMessages = async ({
   conversationId,
+  scope,
   page = 1,
   pageSize = 100,
 }: {
   conversationId: string;
+  scope: UserScope;
   page?: number;
   pageSize?: number;
 }): Promise<MessagesResponse> => {
+  // SECURITY: Validate conversation belongs to current tenant before fetching messages
+  const { data: conversation, error: convError } = await supabase
+    .from("conversations")
+    .select("tenant_id")
+    .eq("id", conversationId)
+    .eq("tenant_id", scope.tenantId)
+    .single();
+
+  if (convError || !conversation) {
+    console.error("Conversation not found or unauthorized access:", convError);
+    throw new Error("Conversation not found or unauthorized access");
+  }
+
   const offset = (page - 1) * pageSize;
 
   const { data, error, count } = await supabase
@@ -493,16 +508,18 @@ export const listMessages = async ({
 };
 
 export const sendMessage = async (
-  input: SendMessageInput
+  input: SendMessageInput,
+  scope: UserScope
 ): Promise<MessageWithSender | null> => {
   // Validate input with Zod
   const validated = sendMessageSchema.parse(input);
 
-  // Get conversation to retrieve phone_number_id
+  // SECURITY: Get conversation and validate tenant ownership
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .select("whatsapp_number_id")
+    .select("whatsapp_number_id, tenant_id")
     .eq("id", validated.conversation_id)
+    .eq("tenant_id", scope.tenantId)  // CRITICAL: Validate tenant ownership
     .single();
 
   if (convError) {

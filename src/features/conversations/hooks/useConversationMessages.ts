@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { listMessages } from "../services/conversation.service";
 import * as conversationsApi from "@/lib/api/endpoints/conversations.api";
+import { useProfile } from "@/hooks/useProfile";
 
 const USE_API_GATEWAY = import.meta.env.VITE_USE_API_GATEWAY === 'true';
 
 export function useConversationMessages(conversationId: string | null) {
+  const { scope } = useProfile();
+
   const query = useQuery({
     queryKey: ["conversation-messages", conversationId],
     queryFn: async () => {
-      if (!conversationId) {
+      if (!conversationId || !scope) {
         return { messages: [], total: 0, page: 1, pageSize: 100, totalPages: 0 };
       }
 
@@ -21,8 +24,8 @@ export function useConversationMessages(conversationId: string | null) {
           messages: [...result.messages].reverse(),
         };
       } else {
-        // OLD: Direct Supabase
-        const result = await listMessages({ conversationId });
+        // OLD: Direct Supabase - SECURITY: Pass scope for tenant validation
+        const result = await listMessages({ conversationId, scope });
         // Invertir mensajes: la query trae DESC (nuevos primero) pero UI necesita ASC (viejos arriba)
         return {
           ...result,
@@ -30,7 +33,7 @@ export function useConversationMessages(conversationId: string | null) {
         };
       }
     },
-    enabled: !!conversationId,
+    enabled: !!conversationId && !!scope,
     staleTime: 10 * 1000, // 10s - Realtime maneja nuevos mensajes
     refetchOnWindowFocus: false, // Realtime ya maneja updates
   });

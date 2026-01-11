@@ -10,19 +10,18 @@ async function getTenantId(tenantIdOverride?: string): Promise<string> {
   return await getCurrentTenantId();
 }
 
-export async function getCustomFields(tenantId?: string): Promise<CustomField[]> {
-  let query = supabase
+export async function getCustomFields(tenantIdOverride?: string): Promise<CustomField[]> {
+  // SECURITY: Always require tenant_id to prevent data leakage
+  const tenantId = await getTenantId(tenantIdOverride);
+
+  const { data, error } = await supabase
     .from('custom_fields')
     .select('*')
+    .eq('tenant_id', tenantId)  // CRITICAL: Always filter by tenant
     .order('display_order', { ascending: true });
-  
-  if (tenantId) {
-    query = query.eq('tenant_id', tenantId);
-  }
 
-  const { data, error } = await query;
   if (error) throw error;
-  
+
   return (data || []).map(row => ({
     ...row,
     field_type: row.field_type as CustomField['field_type'],
@@ -50,11 +49,19 @@ export async function createCustomField(
   };
 }
 
-export async function updateCustomField(id: string, updates: Partial<CustomField>): Promise<CustomField> {
+export async function updateCustomField(
+  id: string,
+  updates: Partial<CustomField>,
+  tenantIdOverride?: string
+): Promise<CustomField> {
+  // SECURITY: Validate tenant ownership before update
+  const tenantId = await getTenantId(tenantIdOverride);
+
   const { data, error } = await supabase
     .from('custom_fields')
     .update(updates)
     .eq('id', id)
+    .eq('tenant_id', tenantId)  // CRITICAL: Ensure tenant ownership
     .select()
     .single();
 
@@ -66,21 +73,32 @@ export async function updateCustomField(id: string, updates: Partial<CustomField
   };
 }
 
-export async function deleteCustomField(id: string): Promise<void> {
+export async function deleteCustomField(id: string, tenantIdOverride?: string): Promise<void> {
+  // SECURITY: Validate tenant ownership before delete
+  const tenantId = await getTenantId(tenantIdOverride);
+
   const { error } = await supabase
     .from('custom_fields')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('tenant_id', tenantId);  // CRITICAL: Ensure tenant ownership
 
   if (error) throw error;
 }
 
-export async function reorderFields(fields: { id: string; display_order: number }[]): Promise<void> {
+export async function reorderFields(
+  fields: { id: string; display_order: number }[],
+  tenantIdOverride?: string
+): Promise<void> {
+  // SECURITY: Validate tenant ownership before reordering
+  const tenantId = await getTenantId(tenantIdOverride);
+
   const updates = fields.map(field =>
     supabase
       .from('custom_fields')
       .update({ display_order: field.display_order })
       .eq('id', field.id)
+      .eq('tenant_id', tenantId)  // CRITICAL: Ensure tenant ownership
   );
 
   await Promise.all(updates);

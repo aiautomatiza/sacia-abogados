@@ -1,14 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendMessage } from "../services/conversation.service";
 import { useToast } from "@/hooks/use-toast";
+import { useProfile } from "@/hooks/useProfile";
 import type { SendMessageInput, MessageWithSender } from "../types";
 
 export function useSendMessage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { scope } = useProfile();
 
   const mutation = useMutation({
-    mutationFn: (input: SendMessageInput) => sendMessage(input),
+    mutationFn: (input: SendMessageInput) => {
+      if (!scope) {
+        throw new Error("User scope not available");
+      }
+      // SECURITY: Pass scope for tenant validation
+      return sendMessage(input, scope);
+    },
     onMutate: async (variables) => {
       const queryKey = ["conversation-messages", variables.conversation_id];
 

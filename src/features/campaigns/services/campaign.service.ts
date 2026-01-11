@@ -60,6 +60,22 @@ export async function getCampaign(id: string): Promise<Campaign> {
 }
 
 export async function getCampaignBatches(campaignId: string): Promise<CampaignBatch[]> {
+  // SECURITY: Validate campaign belongs to current tenant before fetching batches
+  const tenantId = await getCurrentTenantId();
+
+  // First, verify campaign ownership
+  const { data: campaign, error: campaignError } = await supabase
+    .from('campaigns')
+    .select('tenant_id')
+    .eq('id', campaignId)
+    .eq('tenant_id', tenantId)
+    .single();
+
+  if (campaignError || !campaign) {
+    throw new Error('Campaign not found or unauthorized access');
+  }
+
+  // Now fetch batches (safe because we validated ownership)
   const { data, error } = await supabase
     .from('campaign_queue')
     .select('*')

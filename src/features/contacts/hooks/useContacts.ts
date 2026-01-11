@@ -12,8 +12,11 @@ export function useContacts(
   page: number = 1,
   pageSize: number = 30
 ) {
+  const { scope } = useAuth();
+
   return useQuery({
-    queryKey: ['contacts', filters, page, pageSize],
+    // SECURITY: Include tenantId in query key to prevent cache cross-contamination
+    queryKey: ['contacts', scope?.tenantId, filters, page, pageSize],
     queryFn: async () => {
       if (USE_API_GATEWAY) {
         // NEW: API Gateway
@@ -31,6 +34,7 @@ export function useContacts(
         return contactService.getContacts(filters, page, pageSize);
       }
     },
+    enabled: !!scope?.tenantId,
   });
 }
 
@@ -38,7 +42,8 @@ export function useContact(id: string) {
   const { scope } = useAuth();
 
   return useQuery({
-    queryKey: ['contact', id],
+    // SECURITY: Include tenantId in query key to prevent cache cross-contamination
+    queryKey: ['contact', scope?.tenantId, id],
     queryFn: async () => {
       if (USE_API_GATEWAY) {
         // NEW: API Gateway
