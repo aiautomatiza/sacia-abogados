@@ -1,12 +1,15 @@
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { StatusFilter } from './StatusFilter';
 
 interface ContactFiltersProps {
   search: string;
   onSearchChange: (search: string) => void;
+  statusIds: string[];
+  onStatusIdsChange: (statusIds: string[]) => void;
 }
 
-export function ContactFilters({ search, onSearchChange }: ContactFiltersProps) {
+export function ContactFilters({ search, onSearchChange, statusIds, onStatusIdsChange }: ContactFiltersProps) {
   return (
     <div className="flex items-center gap-4">
       <div className="relative flex-1 max-w-sm">
@@ -18,6 +21,7 @@ export function ContactFilters({ search, onSearchChange }: ContactFiltersProps) 
           className="pl-9"
         />
       </div>
+      <StatusFilter value={statusIds} onChange={onStatusIdsChange} />
     </div>
   );
 }

@@ -14,6 +14,9 @@ export interface Contact {
   numero: string;
   nombre: string | null;
   attributes: Record<string, any>;
+  status_id: string | null;
+  status_updated_at: string | null;
+  status_updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +39,7 @@ export interface ContactsResponse {
  */
 export interface ContactFilters {
   search?: string;
+  status_ids?: string[]; // Filter by status IDs (multi-select)
   page?: number;
   pageSize?: number;
 }
@@ -47,6 +51,7 @@ export interface CreateContactInput {
   numero: string;
   nombre?: string;
   attributes?: Record<string, any>;
+  status_id?: string; // Optional: status to assign on creation
   skip_external_sync?: boolean;
 }
 
@@ -57,6 +62,7 @@ export interface UpdateContactInput {
   numero?: string;
   nombre?: string;
   attributes?: Record<string, any>;
+  status_id?: string | null; // Optional: update contact status
 }
 
 /**
@@ -70,6 +76,10 @@ export async function getContacts(filters: ContactFilters = {}): Promise<Contact
 
   if (filters.search) {
     params.search = filters.search;
+  }
+  if (filters.status_ids && filters.status_ids.length > 0) {
+    // Send as comma-separated string
+    params.status_ids = filters.status_ids.join(',');
   }
   if (filters.page) {
     params.page = filters.page.toString();

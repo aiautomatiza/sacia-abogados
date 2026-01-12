@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as contactService from '../services/contact.service';
 import * as contactsApi from '@/lib/api/endpoints/contacts.api';
+import * as contactStatusApi from '@/lib/api/endpoints/contact-statuses.api';
 import type { Contact, ContactFilters } from '../types';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
@@ -22,6 +23,7 @@ export function useContacts(
         // NEW: API Gateway
         const response = await contactsApi.getContacts({
           search: filters.search,
+          status_ids: filters.status_ids,
           page,
           pageSize
         });
@@ -164,4 +166,49 @@ export function useContactMutations() {
     deleteContact,
     deleteContactsBulk,
   };
+}
+
+/**
+ * Mutation for updating a contact's status
+ * - Automatically logs change to history
+ * - Updates status_updated_at and status_updated_by
+ *
+ * @returns Mutation object for updating contact status
+ *
+ * @example
+ * const updateStatus = useContactStatusMutation();
+ * updateStatus.mutate({ contactId: 'uuid', statusId: 'status-uuid' });
+ */
+export function useContactStatusMutation() {
+  const queryClient = useQueryClient();
+  const { scope } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ contactId, statusId }: { contactId: string; statusId: string | null }) => {
+      if (USE_API_GATEWAY) {
+        // NEW: API Gateway
+        return contactStatusApi.updateContactStatusAssignment(contactId, statusId);
+      } else {
+        // OLD: Direct Supabase
+        if (!scope?.tenantId || !scope?.userId) {
+          throw new Error('User scope not available');
+        }
+        return contactService.updateContactStatus(
+          contactId,
+          statusId,
+          scope.tenantId,
+          scope.userId
+        );
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['contact'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-status-history'] });
+      toast.success('Estado actualizado');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Error al actualizar estado');
+    },
+  });
 }

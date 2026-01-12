@@ -23,6 +23,7 @@ export const contactsRoutes = new Hono();
  *
  * Query params:
  * - search: string (optional) - Search by phone number or name
+ * - status_ids: string (optional) - Comma-separated list of status IDs to filter by
  * - page: number (default: 1)
  * - pageSize: number (default: 30)
  *
@@ -37,13 +38,19 @@ contactsRoutes.get('/', async (c) => {
   const supabaseClient = c.get('supabaseClient') as SupabaseClient;
 
   const search = c.req.query('search') || '';
+  const statusIdsParam = c.req.query('status_ids') || '';
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '30');
+
+  // Parse status_ids from comma-separated string
+  const status_ids = statusIdsParam
+    ? statusIdsParam.split(',').map(id => id.trim()).filter(id => id.length > 0)
+    : undefined;
 
   const result = await contactsService.getContacts(
     supabaseClient,
     userScope,
-    { search },
+    { search, status_ids },
     page,
     pageSize
   );

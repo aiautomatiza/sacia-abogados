@@ -9,6 +9,7 @@ import { useCustomFields } from '../hooks/useCustomFields';
 import { useContactMutations } from '../hooks/useContacts';
 import { buildContactSchema } from '../lib/validations';
 import { DynamicFieldInput } from './DynamicFieldInput';
+import { StatusSelect } from './StatusSelect';
 import type { Contact } from '../types';
 
 interface ContactDialogProps {
@@ -27,6 +28,7 @@ export function ContactDialog({ open, onOpenChange, contact }: ContactDialogProp
     defaultValues: {
       numero: '',
       nombre: '',
+      status_id: null,
     },
   });
 
@@ -35,12 +37,14 @@ export function ContactDialog({ open, onOpenChange, contact }: ContactDialogProp
       form.reset({
         numero: contact.numero,
         nombre: contact.nombre || '',
+        status_id: contact.status_id,
         ...contact.attributes,
       });
     } else {
       form.reset({
         numero: '',
         nombre: '',
+        status_id: null,
       });
     }
   }, [contact, form]);
@@ -94,6 +98,23 @@ export function ContactDialog({ open, onOpenChange, contact }: ContactDialogProp
                   <FormLabel>Nombre</FormLabel>
                   <FormControl>
                     <Input placeholder="Ingrese el nombre" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estado</FormLabel>
+                  <FormControl>
+                    <StatusSelect
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

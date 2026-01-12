@@ -6,6 +6,7 @@
 import type { Hono } from 'https://deno.land/x/hono@v3.12.8/mod.ts';
 import { customFieldsRoutes } from './custom-fields.routes.ts';
 import { contactsRoutes } from './contacts.routes.ts';
+import { contactStatusesRoutes } from './contact-statuses.routes.ts';
 import { conversationsRoutes } from './conversations.routes.ts';
 import { tagsRoutes } from './tags.routes.ts';
 import { campaignsRoutes } from './campaigns.routes.ts';
@@ -27,6 +28,10 @@ export function registerRoutes(app: Hono) {
   // Phase 2: Contacts routes (ACTIVE)
   app.route('/api/contacts', contactsRoutes);
   console.log('[routes] ✅ Contacts routes registered');
+
+  // Contact Statuses routes (ACTIVE)
+  app.route('/api/contact-statuses', contactStatusesRoutes);
+  console.log('[routes] ✅ Contact Statuses routes registered');
 
   // Phase 3 & 4: Conversations routes - Queries + Mutations (ACTIVE)
   app.route('/api/conversations', conversationsRoutes);

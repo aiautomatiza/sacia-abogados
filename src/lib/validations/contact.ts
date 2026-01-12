@@ -25,6 +25,11 @@ export const createContactSchema = z.object({
     .record(z.unknown())
     .optional()
     .default({}),
+  status_id: z
+    .string()
+    .uuid('Invalid status ID')
+    .nullable()
+    .optional(),
 }).passthrough(); // Allow custom fields to pass through
 
 /**
@@ -47,6 +52,11 @@ export const updateContactSchema = z.object({
     .optional(),
   attributes: z
     .record(z.unknown())
+    .optional(),
+  status_id: z
+    .string()
+    .uuid('Invalid status ID')
+    .nullable()
     .optional(),
 }).passthrough() // Allow custom fields to pass through
 .refine(

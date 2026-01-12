@@ -4,6 +4,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { StatusBadge } from './StatusBadge';
+import { useActiveContactStatuses } from '../hooks/useContactStatuses';
 import type { Contact, CustomField } from '../types';
 
 interface ContactsTableProps {
@@ -23,7 +25,14 @@ export function ContactsTable({
   onEdit,
   onDelete,
 }: ContactsTableProps) {
+  const { data: statuses = [] } = useActiveContactStatuses();
   const allSelected = contacts.length > 0 && selectedIds.length === contacts.length;
+
+  // Helper to get status object from status_id
+  const getStatus = (statusId: string | null) => {
+    if (!statusId) return null;
+    return statuses.find(s => s.id === statusId) || null;
+  };
 
   const handleSelectAll = () => {
     if (allSelected) {
@@ -74,6 +83,7 @@ export function ContactsTable({
               </TableHead>
               <TableHead className="bg-muted">Número</TableHead>
               <TableHead className="bg-muted">Nombre</TableHead>
+              <TableHead className="bg-muted">Estado</TableHead>
               {customFields.map((field) => (
                 <TableHead key={field.id} className="bg-muted">{field.field_label}</TableHead>
               ))}
@@ -84,7 +94,7 @@ export function ContactsTable({
           <TableBody>
             {contacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5 + customFields.length} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6 + customFields.length} className="text-center text-muted-foreground py-8">
                   No hay contactos. Crea uno nuevo o importa desde CSV.
                 </TableCell>
               </TableRow>
@@ -100,6 +110,9 @@ export function ContactsTable({
                   </TableCell>
                   <TableCell className="font-medium">{contact.numero}</TableCell>
                   <TableCell>{contact.nombre || '-'}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={getStatus(contact.status_id)} />
+                  </TableCell>
                   {customFields.map((field) => (
                     <TableCell key={field.id}>
                       {formatValue(contact.attributes[field.field_name], field.field_type)}

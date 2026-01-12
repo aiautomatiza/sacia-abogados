@@ -94,6 +94,7 @@ export const createContactSchema = z.object({
     .optional(),
   attributes: z.record(z.any()).optional(),
   skip_external_sync: z.boolean().optional(),
+  status_id: z.string().uuid('Invalid status ID').nullable().optional(),
 });
 
 /**
@@ -109,6 +110,7 @@ export const updateContactSchema = z.object({
     .max(200, 'Name too long')
     .optional(),
   attributes: z.record(z.any()).optional(),
+  status_id: z.string().uuid('Invalid status ID').nullable().optional(),
 });
 
 /**
@@ -119,6 +121,69 @@ export const bulkDeleteSchema = z.object({
   ids: z.array(z.string().uuid('Invalid contact ID'))
     .min(1, 'At least one contact ID is required')
     .max(100, 'Cannot delete more than 100 contacts at once'),
+});
+
+// ============================================================================
+// CONTACT STATUSES VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Create Contact Status schema
+ * Validates input for creating a new contact status
+ */
+export const createContactStatusSchema = z.object({
+  name: z.string()
+    .min(1, 'Status name is required')
+    .max(50, 'Status name too long')
+    .trim(),
+  color: z.string()
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (e.g., #FF5733)'),
+  icon: z.string()
+    .max(50, 'Icon name too long')
+    .nullable()
+    .optional(),
+  is_default: z.boolean().optional().default(false),
+});
+
+/**
+ * Update Contact Status schema
+ * Partial update - all fields are optional
+ */
+export const updateContactStatusSchema = z.object({
+  name: z.string()
+    .min(1, 'Status name is required')
+    .max(50, 'Status name too long')
+    .trim()
+    .optional(),
+  color: z.string()
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (e.g., #FF5733)')
+    .optional(),
+  icon: z.string()
+    .max(50, 'Icon name too long')
+    .nullable()
+    .optional(),
+  is_default: z.boolean().optional(),
+});
+
+/**
+ * Reorder Contact Statuses schema
+ * Validates array of { id, display_order } for bulk reordering
+ */
+export const reorderContactStatusesSchema = z.object({
+  statuses: z.array(
+    z.object({
+      id: z.string().uuid('Invalid status ID'),
+      display_order: z.number().int().min(0, 'Display order must be non-negative'),
+    })
+  ).min(1, 'At least one status is required'),
+});
+
+/**
+ * Update Contact Status Assignment schema
+ * Validates status assignment for a contact
+ */
+export const updateContactStatusAssignmentSchema = z.object({
+  status_id: z.string().uuid('Invalid status ID').nullable(),
 });
 
 // ============================================================================

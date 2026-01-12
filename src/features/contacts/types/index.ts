@@ -4,6 +4,9 @@ export interface Contact {
   numero: string;
   nombre: string | null;
   attributes: Record<string, any>;
+  status_id: string | null;
+  status_updated_at: string | null;
+  status_updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,5 +32,16 @@ export interface ContactFormData {
 
 export interface ContactFilters {
   search?: string;
+  status_ids?: string[]; // Multi-select filter for statuses
   [key: string]: any;
 }
+
+/**
+ * Contact with status relationship included (from JOIN)
+ */
+export interface ContactWithStatus extends Contact {
+  status?: import('./status.types').ContactStatus | null;
+}
+
+// Re-export status types
+export * from './status.types';

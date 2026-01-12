@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   useCustomFields,
   useCustomFieldMutations,
@@ -72,6 +73,26 @@ export default function ContactSettings() {
           </Button>
         </div>
       </div>
+
+      {/* Status Settings Card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tag className="h-5 w-5" />
+            Estados de Contactos
+          </CardTitle>
+          <CardDescription>
+            Configura los estados personalizados para clasificar tus contactos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/contacts/settings/statuses">
+            <Button variant="outline">
+              Gestionar Estados
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

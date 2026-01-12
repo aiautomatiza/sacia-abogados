@@ -27,6 +27,7 @@ export interface Contact {
  */
 export interface ContactFilters {
   search?: string;
+  status_ids?: string[];
 }
 
 /**
@@ -185,6 +186,11 @@ export async function getContacts(
     if (searchFilter) {
       query = query.or(searchFilter);
     }
+  }
+
+  // Apply status filter (multi-select)
+  if (filters.status_ids && filters.status_ids.length > 0) {
+    query = query.in('status_id', filters.status_ids);
   }
 
   // Pagination

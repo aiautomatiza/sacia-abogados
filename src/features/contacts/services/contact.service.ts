@@ -23,6 +23,11 @@ export async function getContacts(
     }
   }
 
+  // Filter by status
+  if (filters.status_ids && filters.status_ids.length > 0) {
+    query = query.in('status_id', filters.status_ids);
+  }
+
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
@@ -162,4 +167,26 @@ export async function deleteContactsBulk(ids: string[], scope: UserScope): Promi
     .eq('tenant_id', scope.tenantId);
 
   if (error) throw error;
+}
+
+/**
+ * Update contact status (triggers history logging automatically)
+ */
+export async function updateContactStatus(
+  contactId: string,
+  statusId: string | null,
+  tenantId: string,
+  userId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('crm_contacts')
+    .update({
+      status_id: statusId,
+      status_updated_at: new Date().toISOString(),
+      status_updated_by: userId,
+    })
+    .eq('id', contactId)
+    .eq('tenant_id', tenantId);
+
+  if (error) throw new Error(`Error al cambiar estado: ${error.message}`);
 }

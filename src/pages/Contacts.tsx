@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Settings, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useRealtime } from "@/hooks/use-realtime";
+import { useAuth } from "@/contexts/auth-context";
 import {
   useContacts,
   useContactMutations,
@@ -17,6 +19,8 @@ import {
 } from "@/features/contacts";
 
 export default function Contacts() {
+  const { scope } = useAuth();
+
   // URL state management
   const { urlPage, urlSearch, setUrlPage, setUrlSearch } = useContactsUrlState();
 
@@ -36,6 +40,7 @@ export default function Contacts() {
 
   // Local state
   const [search, setSearch] = useState("");
+  const [statusIds, setStatusIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -70,12 +75,31 @@ export default function Contacts() {
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Data fetching with pageSize
-  const { data: contactsData, isLoading } = useContacts({ search }, page, pageSize);
+  const { data: contactsData, isLoading } = useContacts({ search, status_ids: statusIds }, page, pageSize);
   const { data: customFields = [] } = useCustomFields();
   const { deleteContactsBulk } = useContactMutations();
 
   const contacts = contactsData?.data || [];
   const totalCount = contactsData?.total || 0;
+
+  // Realtime subscriptions for contacts and statuses
+  useRealtime({
+    subscriptions: [
+      {
+        table: 'crm_contacts',
+        event: '*',
+        filter: `tenant_id=eq.${scope?.tenantId}`,
+        queryKeysToInvalidate: [['contacts']],
+      },
+      {
+        table: 'crm_contact_statuses',
+        event: '*',
+        filter: `tenant_id=eq.${scope?.tenantId}`,
+        queryKeysToInvalidate: [['contact-statuses']],
+      },
+    ],
+    enabled: !!scope?.tenantId,
+  });
 
   // Calculate pagination info
   const paginationInfo = useMemo(
@@ -139,7 +163,12 @@ export default function Contacts() {
       </div>
 
       <div className="flex justify-between items-center mb-4">
-        <ContactFilters search={search} onSearchChange={setSearch} />
+        <ContactFilters
+          search={search}
+          onSearchChange={setSearch}
+          statusIds={statusIds}
+          onStatusIdsChange={setStatusIds}
+        />
         {selectedIds.length > 0 && (
           <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
             <Trash2 className="h-4 w-4" />
