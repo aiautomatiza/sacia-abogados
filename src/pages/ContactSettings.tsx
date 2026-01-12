@@ -1,59 +1,60 @@
-import { useState } from 'react';
+/**
+ * @fileoverview Contact Settings Page
+ * @description Central configuration page for contacts with tabbed interface
+ */
+
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft, Tag } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  useCustomFields,
-  useCustomFieldMutations,
-  CustomFieldsList,
-  CustomFieldDialog,
-  type CustomField,
-} from '@/features/contacts';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ArrowLeft } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomFieldsTab, StatusesTab } from '@/features/contacts';
 
+/**
+ * Valid tab values
+ */
+type TabValue = 'fields' | 'statuses';
+
+const DEFAULT_TAB: TabValue = 'fields';
+
+/**
+ * ContactSettings - Central configuration page for contacts
+ *
+ * Features:
+ * - Tabbed interface for different configuration sections
+ * - Query param-based tab state (?tab=fields or ?tab=statuses)
+ * - Scalable architecture for adding more tabs
+ *
+ * Tabs:
+ * - fields: Custom fields configuration
+ * - statuses: Contact statuses configuration
+ *
+ * @example
+ * // Navigate to fields tab
+ * /contacts/settings?tab=fields
+ *
+ * // Navigate to statuses tab
+ * /contacts/settings?tab=statuses
+ */
 export default function ContactSettings() {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedField, setSelectedField] = useState<CustomField | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') as TabValue) || DEFAULT_TAB;
 
-  const { data: customFields = [], isLoading } = useCustomFields();
-  const { deleteField } = useCustomFieldMutations();
-
-  const handleEdit = (field: CustomField) => {
-    setSelectedField(field);
-    setDialogOpen(true);
-  };
-
-  const handleDelete = (field: CustomField) => {
-    setSelectedField(field);
-    setDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (selectedField) {
-      await deleteField.mutateAsync(selectedField.id);
-      setSelectedField(null);
-      setDeleteDialogOpen(false);
+  // Validate and set default tab if invalid
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (!tab || (tab !== 'fields' && tab !== 'statuses')) {
+      setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
     }
-  };
+  }, [searchParams, setSearchParams]);
 
-  const handleDialogClose = (open: boolean) => {
-    setDialogOpen(open);
-    if (!open) setSelectedField(null);
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Header */}
       <div className="mb-6">
         <Link to="/contacts">
           <Button variant="ghost" className="gap-2 mb-4">
@@ -61,65 +62,30 @@ export default function ContactSettings() {
             Volver a Contactos
           </Button>
         </Link>
-        
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Configuración de Campos</h1>
-            <p className="text-muted-foreground mt-1">Define los campos personalizados para tus contactos</p>
-          </div>
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Campo
-          </Button>
+
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
+          <p className="text-muted-foreground mt-1">
+            Configura los campos y estados para la gestión de tus contactos
+          </p>
         </div>
       </div>
 
-      {/* Status Settings Card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5" />
-            Estados de Contactos
-          </CardTitle>
-          <CardDescription>
-            Configura los estados personalizados para clasificar tus contactos
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link to="/contacts/settings/statuses">
-            <Button variant="outline">
-              Gestionar Estados
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="fields">Campos Personalizados</TabsTrigger>
+          <TabsTrigger value="statuses">Estados</TabsTrigger>
+        </TabsList>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        <CustomFieldsList fields={customFields} onEdit={handleEdit} onDelete={handleDelete} />
-      )}
+        <TabsContent value="fields" className="space-y-4">
+          <CustomFieldsTab />
+        </TabsContent>
 
-      <CustomFieldDialog open={dialogOpen} onOpenChange={handleDialogClose} editingField={selectedField} />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar campo personalizado?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el campo "{selectedField?.field_label}" de todos los contactos existentes.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <TabsContent value="statuses" className="space-y-4">
+          <StatusesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -152,7 +152,7 @@ export default function Contacts() {
           <Link to="/contacts/settings">
             <Button variant="outline" className="gap-2">
               <Settings className="h-4 w-4" />
-              Configurar Campos
+              Configuración
             </Button>
           </Link>
           <Button onClick={() => setDialogOpen(true)} className="gap-2">

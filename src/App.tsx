@@ -10,7 +10,6 @@ import Auth from "./pages/Auth";
 import Contacts from "./pages/Contacts";
 import Calls from "./pages/Calls";
 import ContactSettings from "./pages/ContactSettings";
-import ContactStatusesSettings from "./pages/ContactStatusesSettings";
 import Campaigns from "./pages/Campaigns";
 import NewCampaign from "./pages/NewCampaign";
 import CampaignDetail from "./pages/CampaignDetail";
@@ -84,7 +83,6 @@ const App = () => (
               <Route path="/conversations" element={<Conversations />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/contacts/settings" element={<ContactSettings />} />
-              <Route path="/contacts/settings/statuses" element={<ContactStatusesSettings />} />
               <Route path="/campaigns" element={<Campaigns />} />
               <Route path="/campaigns/new" element={<NewCampaign />} />
               <Route path="/campaigns/:id" element={<CampaignDetail />} />

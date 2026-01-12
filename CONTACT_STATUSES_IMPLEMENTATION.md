@@ -130,11 +130,16 @@
 - Filtro integrado en useContacts query
 - Realtime subscriptions para contacts y statuses
 
-### 11. Página de Configuración de Estados ✅
-- ✅ **Archivo**: `src/pages/ContactStatusesSettings.tsx`
-- Ruta: `/contacts/settings/statuses`
-- Integra componente `<StatusManager />`
-- Botón "Volver a Configuración"
+### 11. Página de Configuración con Tabs ✅
+- ✅ **Archivo**: `src/pages/ContactSettings.tsx` (refactorizado)
+- Ruta: `/contacts/settings?tab=fields` o `/contacts/settings?tab=statuses`
+- Sistema de tabs escalable con query params
+- Tab "Campos Personalizados": Gestión de custom fields
+- Tab "Estados": Gestión de estados de contactos
+- **Componentes de Tab**:
+  - `src/features/contacts/components/CustomFieldsTab.tsx`
+  - `src/features/contacts/components/StatusesTab.tsx`
+- Arquitectura optimizada para agregar más tabs en el futuro
 - ✅ Ruta añadida en `src/App.tsx`
 - ✅ Link añadido en `src/pages/ContactSettings.tsx` (Card con botón "Gestionar Estados")
 

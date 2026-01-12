@@ -57,7 +57,7 @@ const navigationItems: NavigationItem[] = [
     roles: ['user_client', 'super_admin'],
   },
   {
-    title: 'Configurar Campos',
+    title: 'Configuración',
     url: '/contacts/settings',
     icon: Settings,
     group: 'Configuración',

@@ -16,6 +16,8 @@ export { ContactsPagination } from './components/ContactsPagination';
 export { DynamicFieldInput } from './components/DynamicFieldInput';
 export { CustomFieldsList } from './components/CustomFieldsList';
 export { CustomFieldDialog } from './components/CustomFieldDialog';
+export { CustomFieldsTab } from './components/CustomFieldsTab';
+export { StatusesTab } from './components/StatusesTab';
 
 // Lib
 export { buildContactSchema } from './lib/validations';
