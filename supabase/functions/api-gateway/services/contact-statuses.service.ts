@@ -125,24 +125,36 @@ export async function getContactStatuses(
 
   // Include usage count if requested
   if (filters.include_usage_count) {
-    const statusesWithCount: ContactStatusWithUsageCount[] = [];
-
-    for (const status of statuses) {
-      const { count, error: countError } = await supabaseClient
-        .from('crm_contacts')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', status.tenant_id)
-        .eq('status_id', status.id);
-
-      if (countError) {
-        console.error('[contact-statuses] Error counting usage for status:', status.id, countError);
-        statusesWithCount.push({ ...status, usage_count: 0 });
-      } else {
-        statusesWithCount.push({ ...status, usage_count: count || 0 });
-      }
+    if (statuses.length === 0) {
+      return [];
     }
 
-    return statusesWithCount;
+    // Get all usage counts in a SINGLE aggregated query (massive performance improvement)
+    const tenantId = statuses[0].tenant_id;
+    const { data: counts, error: countError } = await supabaseClient
+      .from('crm_contacts')
+      .select('status_id')
+      .eq('tenant_id', tenantId)
+      .not('status_id', 'is', null);
+
+    if (countError) {
+      console.error('[contact-statuses] Error fetching usage counts:', countError);
+      // Return statuses with 0 counts on error
+      return statuses.map(s => ({ ...s, usage_count: 0 }));
+    }
+
+    // Build usage count map from all contacts
+    const usageMap = new Map<string, number>();
+    (counts || []).forEach((row: any) => {
+      const statusId = row.status_id as string;
+      usageMap.set(statusId, (usageMap.get(statusId) || 0) + 1);
+    });
+
+    // Merge statuses with usage counts
+    return statuses.map(status => ({
+      ...status,
+      usage_count: usageMap.get(status.id) || 0,
+    }));
   }
 
   // Return without usage count

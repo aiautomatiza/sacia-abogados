@@ -57,6 +57,9 @@ export async function getContactStatuses(
   if (filters.search) {
     params.search = filters.search;
   }
+  if (filters.include_usage_count !== undefined) {
+    params.include_usage_count = filters.include_usage_count.toString();
+  }
 
   return apiRequest<ContactStatusesResponse>('/api/contact-statuses', {
     method: 'GET',

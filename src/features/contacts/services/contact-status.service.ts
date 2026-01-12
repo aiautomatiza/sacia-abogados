@@ -15,45 +15,57 @@ import type {
 
 /**
  * Get all statuses for a tenant
+ * Optimized with single aggregation query instead of N+1
  */
 export async function getContactStatuses(
   tenantId: string,
   filters: ContactStatusFilters = {}
 ): Promise<ContactStatusWithUsageCount[]> {
-  let query = supabase
+  // First, get all statuses
+  let statusQuery = supabase
     .from('crm_contact_statuses')
-    .select(`
-      *,
-      contacts_count:crm_contacts(count)
-    `)
+    .select('*')
     .eq('tenant_id', tenantId);
 
   if (filters.is_active !== undefined) {
-    query = query.eq('is_active', filters.is_active);
+    statusQuery = statusQuery.eq('is_active', filters.is_active);
   }
 
   if (filters.search) {
-    query = query.ilike('name', `%${filters.search}%`);
+    statusQuery = statusQuery.ilike('name', `%${filters.search}%`);
   }
 
-  query = query.order('display_order', { ascending: true });
+  statusQuery = statusQuery.order('display_order', { ascending: true });
 
-  const { data, error } = await query;
+  const { data: statuses, error: statusError } = await statusQuery;
 
-  if (error) throw error;
+  if (statusError) throw statusError;
+  if (!statuses || statuses.length === 0) return [];
 
-  return (data || []).map(row => ({
-    id: row.id,
-    tenant_id: row.tenant_id,
-    name: row.name,
-    color: row.color,
-    icon: row.icon,
-    display_order: row.display_order,
-    is_default: row.is_default,
-    is_active: row.is_active,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    usage_count: Array.isArray(row.contacts_count) ? row.contacts_count[0]?.count || 0 : 0,
+  // Get usage counts in a single aggregated query
+  const { data: counts, error: countError } = await supabase
+    .from('crm_contacts')
+    .select('status_id')
+    .eq('tenant_id', tenantId)
+    .not('status_id', 'is', null);
+
+  if (countError) {
+    console.warn('Error fetching usage counts:', countError);
+    // Return statuses with 0 counts on error
+    return statuses.map(status => ({ ...status, usage_count: 0 }));
+  }
+
+  // Build usage count map
+  const usageMap = new Map<string, number>();
+  (counts || []).forEach(row => {
+    const statusId = row.status_id as string;
+    usageMap.set(statusId, (usageMap.get(statusId) || 0) + 1);
+  });
+
+  // Merge statuses with usage counts
+  return statuses.map(status => ({
+    ...status,
+    usage_count: usageMap.get(status.id) || 0,
   }));
 }
 

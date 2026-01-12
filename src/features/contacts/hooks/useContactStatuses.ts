@@ -14,26 +14,34 @@ const USE_API_GATEWAY = import.meta.env.VITE_USE_API_GATEWAY === 'true';
 /**
  * Fetch all contact statuses for current tenant
  *
- * @param filters - Optional filters (is_active, search)
+ * @param filters - Optional filters (is_active, search, include_usage_count)
  * @returns Query result with statuses and usage counts
  *
  * @example
  * const { data: statuses, isLoading } = useContactStatuses({ is_active: true });
+ *
+ * @note Usage counts are included by default. Set include_usage_count: false to disable.
  */
 export function useContactStatuses(filters: ContactStatusFilters = {}) {
   const { scope } = useAuth();
 
+  // Include usage count by default (most common use case)
+  const filtersWithDefaults = {
+    include_usage_count: true,
+    ...filters,
+  };
+
   return useQuery({
-    queryKey: ['contact-statuses', scope?.tenantId, filters],
+    queryKey: ['contact-statuses', scope?.tenantId, filtersWithDefaults],
     queryFn: async () => {
       if (USE_API_GATEWAY) {
         // NEW: API Gateway (production)
-        const response = await statusApi.getContactStatuses(filters);
+        const response = await statusApi.getContactStatuses(filtersWithDefaults);
         return response.data;
       } else {
         // OLD: Direct Supabase (development)
         if (!scope?.tenantId) throw new Error('Tenant ID not available');
-        return statusService.getContactStatuses(scope.tenantId, filters);
+        return statusService.getContactStatuses(scope.tenantId, filtersWithDefaults);
       }
     },
     enabled: USE_API_GATEWAY ? true : !!scope?.tenantId,

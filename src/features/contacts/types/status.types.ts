@@ -70,4 +70,5 @@ export interface ContactStatusFormData {
 export interface ContactStatusFilters {
   is_active?: boolean;
   search?: string;
+  include_usage_count?: boolean;
 }
