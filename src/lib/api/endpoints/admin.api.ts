@@ -56,9 +56,9 @@ export interface UpdateTenantSettingsInput {
   conversations_enabled?: boolean;
   conversations_webhook_url?: string | null;
   credentials?: {
-    whatsapp?: Record<string, any>;
-    calls?: Record<string, any>;
-    conversations?: Record<string, any>;
+    whatsapp?: string | Record<string, any>;
+    calls?: string | Record<string, any>;
+    conversations?: string | Record<string, any>;
   };
 }
 

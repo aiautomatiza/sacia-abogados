@@ -57,9 +57,9 @@ export interface UpdateTenantSettingsInput {
 }
 
 export interface TenantCredentials {
-  whatsapp?: Record<string, any>;
-  calls?: Record<string, any>;
-  conversations?: Record<string, any>;
+  whatsapp?: string | Record<string, any>;
+  calls?: string | Record<string, any>;
+  conversations?: string | Record<string, any>;
 }
 
 // ============================================================================

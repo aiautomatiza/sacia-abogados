@@ -297,9 +297,9 @@ export const updateTenantSettingsSchema = z.object({
   conversations_enabled: z.boolean().optional(),
   conversations_webhook_url: z.string().nullable().optional(),
   credentials: z.object({
-    whatsapp: z.record(z.any()).optional(),
-    calls: z.record(z.any()).optional(),
-    conversations: z.record(z.any()).optional(),
+    whatsapp: z.union([z.string(), z.record(z.any())]).optional(),
+    calls: z.union([z.string(), z.record(z.any())]).optional(),
+    conversations: z.union([z.string(), z.record(z.any())]).optional(),
   }).optional(),
 });
 
