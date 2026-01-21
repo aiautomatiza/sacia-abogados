@@ -191,7 +191,7 @@ export function StatusManager() {
       </div>
 
       {/* Status List */}
-      <div className="space-y-3">
+      <div className="space-y-3 max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
         {statuses && statuses.length > 0 ? (
           statuses.map((status, index) => (
             <Card key={status.id}>

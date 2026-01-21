@@ -21,7 +21,7 @@ export function CustomFieldsList({ fields, onEdit, onDelete }: CustomFieldsListP
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
       {fields.map((field) => (
         <Card key={field.id}>
           <CardContent className="flex items-center gap-4 p-4">
