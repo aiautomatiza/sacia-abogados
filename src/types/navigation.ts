@@ -4,7 +4,7 @@ import { LucideIcon } from 'lucide-react';
  * Módulos disponibles que pueden ser habilitados/deshabilitados por tenant.
  * Cada módulo se mapea a una configuración específica en tenant_settings.
  */
-export type TenantModule = 'conversations' | 'calls' | 'campaigns';
+export type TenantModule = 'conversations' | 'calls' | 'campaigns' | 'appointments';
 
 export interface NavigationItem {
   title: string;

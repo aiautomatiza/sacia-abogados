@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { UserScope } from '../types/shared.types.ts';
+import { encryptCredential, ENCRYPTION_VERSION } from '../../_shared/crypto.ts';
 
 // ============================================================================
 // TYPES
@@ -34,6 +35,8 @@ export interface TenantSettings {
   calls_phone_number: string | null;
   conversations_enabled: boolean;
   conversations_webhook_url: string | null;
+  appointments_enabled: boolean;
+  appointments_webhook_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,12 +57,15 @@ export interface UpdateTenantSettingsInput {
   calls_phone_number?: string | null;
   conversations_enabled?: boolean;
   conversations_webhook_url?: string | null;
+  appointments_enabled?: boolean;
+  appointments_webhook_url?: string | null;
 }
 
 export interface TenantCredentials {
   whatsapp?: string | Record<string, any>;
   calls?: string | Record<string, any>;
   conversations?: string | Record<string, any>;
+  appointments?: string | Record<string, any>;
 }
 
 // ============================================================================
@@ -159,6 +165,7 @@ export async function createTenant(
       whatsapp_enabled: false,
       calls_enabled: false,
       conversations_enabled: false,
+      appointments_enabled: false,
     });
 
   if (settingsError) {
@@ -303,20 +310,54 @@ export async function updateTenantSettings(
     throw new Error(`Failed to update tenant settings: ${error.message}`);
   }
 
-  // Store credentials if provided (using secrets storage)
+  // Store credentials if provided (encrypted at rest)
   if (credentials) {
-    // Note: Credential storage would need a separate implementation
-    // using Supabase Vault or similar secure storage
-    // For now, we'll log and skip this functionality
+    // Build credential updates for tenant_credentials table
+    const credentialUpdates: Record<string, string | number> = {
+      encryption_version: ENCRYPTION_VERSION,
+    };
+
     if (credentials.whatsapp) {
-      console.log('[ADMIN] WhatsApp credential storage requested for tenant:', tenantId);
-      // TODO: Implement storeCredential function when Vault is available
+      const plainValue = typeof credentials.whatsapp === 'string'
+        ? credentials.whatsapp
+        : JSON.stringify(credentials.whatsapp);
+      // Encrypt before storing
+      credentialUpdates.whatsapp_credential = await encryptCredential(plainValue);
+      console.log('[ADMIN] Storing encrypted WhatsApp credential for tenant:', tenantId);
     }
     if (credentials.calls) {
-      console.log('[ADMIN] Calls credential storage requested for tenant:', tenantId);
+      const plainValue = typeof credentials.calls === 'string'
+        ? credentials.calls
+        : JSON.stringify(credentials.calls);
+      // Encrypt before storing
+      credentialUpdates.calls_credential = await encryptCredential(plainValue);
+      console.log('[ADMIN] Storing encrypted Calls credential for tenant:', tenantId);
     }
     if (credentials.conversations) {
-      console.log('[ADMIN] Conversations credential storage requested for tenant:', tenantId);
+      const plainValue = typeof credentials.conversations === 'string'
+        ? credentials.conversations
+        : JSON.stringify(credentials.conversations);
+      // Encrypt before storing
+      credentialUpdates.conversations_credential = await encryptCredential(plainValue);
+      console.log('[ADMIN] Storing encrypted Conversations credential for tenant:', tenantId);
+    }
+
+    // Upsert credentials if any were provided (excluding just the version)
+    if (Object.keys(credentialUpdates).length > 1) {
+      const { error: credError } = await adminClient
+        .from('tenant_credentials')
+        .upsert({
+          tenant_id: tenantId,
+          ...credentialUpdates,
+        }, {
+          onConflict: 'tenant_id'
+        });
+
+      if (credError) {
+        console.error('[ADMIN] Failed to store credentials:', credError);
+        throw new Error(`Failed to store credentials: ${credError.message}`);
+      }
+      console.log('[ADMIN] Encrypted credentials stored successfully for tenant:', tenantId);
     }
   }
 

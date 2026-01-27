@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useAppointmentsEnabled } from "@/hooks/useTenantSettings";
 import type { CallDetailed } from "../types/call.types";
 import { getCallColumns } from "./call-columns";
 
@@ -39,7 +40,11 @@ export function CallsTable({
   onRowHover,
   density = "comfortable",
 }: CallsTableProps) {
-  const columns = useMemo(() => getCallColumns({ onSort }), [onSort]);
+  const { isEnabled: appointmentsEnabled } = useAppointmentsEnabled();
+  const columns = useMemo(
+    () => getCallColumns({ onSort, showAppointments: appointmentsEnabled }),
+    [onSort, appointmentsEnabled]
+  );
 
   const table = useReactTable({
     data: calls,

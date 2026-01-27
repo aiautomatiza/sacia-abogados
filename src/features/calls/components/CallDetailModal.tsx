@@ -3,6 +3,7 @@
  * @description Modal with tabs (Detail/Transcript/Audio) - supports URL-controlled tabs
  */
 
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useAppointmentsEnabled } from "@/hooks/useTenantSettings";
+import {
+  ContactUpcomingAppointments,
+  AppointmentFormDialog,
+  AppointmentDetailModal,
+  type AppointmentDetailed,
+} from "@/features/appointments";
 import type { CallDetailed } from "../types/call.types";
 import type { CallDetailTab } from "../hooks/use-calls-url-state";
 import {
@@ -50,13 +58,17 @@ interface CallDetailModalProps {
   onTabChange?: (tab: CallDetailTab) => void;
 }
 
-export function CallDetailModal({ 
-  call, 
-  open, 
+export function CallDetailModal({
+  call,
+  open,
   onClose,
   activeTab = "summary",
   onTabChange,
 }: CallDetailModalProps) {
+  const { isEnabled: appointmentsEnabled } = useAppointmentsEnabled();
+  const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentDetailed | null>(null);
+
   const handleTabChange = (value: string) => {
     const urlTab = REVERSE_TAB_MAP[value];
     if (urlTab && onTabChange) {
@@ -212,6 +224,26 @@ export function CallDetailModal({
                 </>
               )}
 
+              {/* Appointments Section */}
+              {appointmentsEnabled && call.contact_id && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                      Citas del contacto
+                    </h4>
+                    <ContactUpcomingAppointments
+                      contactId={call.contact_id}
+                      limit={3}
+                      onCreateClick={() => setIsAppointmentFormOpen(true)}
+                      onAppointmentClick={(apt) => setSelectedAppointment(apt)}
+                      showHeader={false}
+                      compact
+                    />
+                  </div>
+                </>
+              )}
+
               {/* Technical Info */}
               {call.call_sid && (
                 <>
@@ -246,6 +278,26 @@ export function CallDetailModal({
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Appointment Dialogs */}
+        {appointmentsEnabled && call.contact_id && (
+          <>
+            <AppointmentFormDialog
+              open={isAppointmentFormOpen}
+              onOpenChange={setIsAppointmentFormOpen}
+              preSelectedContactId={call.contact_id}
+              preSelectedContactName={call.contact_name || undefined}
+              preSelectedContactPhone={call.contact_phone || undefined}
+            />
+            <AppointmentDetailModal
+              appointment={selectedAppointment}
+              open={!!selectedAppointment}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) setSelectedAppointment(null);
+              }}
+            />
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

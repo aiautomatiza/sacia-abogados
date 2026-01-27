@@ -6,6 +6,7 @@
  * - Ninguno (componente cliente sin referencias a backend específico)
  */
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Square, X, Send, Loader2 } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -13,7 +14,7 @@ import { useAudioConverter } from "../hooks/useAudioConverter";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {
-  onAudioReady: (audioFile: File) => void;
+  onAudioReady: (audioFile: File) => Promise<void>;
   disabled?: boolean;
 }
 
@@ -38,9 +39,12 @@ export function AudioRecorder({ onAudioReady, disabled }: Props) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleSendAudio = async () => {
-    if (!audioBlob) return;
+  const [isSending, setIsSending] = useState(false);
 
+  const handleSendAudio = async () => {
+    if (!audioBlob || isSending) return;
+
+    setIsSending(true);
     try {
       console.log("[AudioRecorder] Original audio format:", audioBlob.type);
       console.log("[AudioRecorder] Original audio size:", audioBlob.size, "bytes");
@@ -60,7 +64,8 @@ export function AudioRecorder({ onAudioReady, disabled }: Props) {
         size: audioFile.size,
       });
 
-      onAudioReady(audioFile);
+      // Wait for upload and send to complete before closing
+      await onAudioReady(audioFile);
       cancelRecording();
     } catch (error) {
       console.error("Error processing audio:", error);
@@ -69,6 +74,8 @@ export function AudioRecorder({ onAudioReady, disabled }: Props) {
         description: error instanceof Error ? error.message : "Por favor, intenta de nuevo",
         variant: "destructive",
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -97,7 +104,7 @@ export function AudioRecorder({ onAudioReady, disabled }: Props) {
           variant="ghost"
           onClick={cancelRecording}
           className="h-8 w-8 shrink-0"
-          disabled={isConverting}
+          disabled={isConverting || isSending}
           title="Cancelar"
         >
           <X className="h-4 w-4" />
@@ -106,10 +113,10 @@ export function AudioRecorder({ onAudioReady, disabled }: Props) {
           size="icon"
           onClick={handleSendAudio}
           className="h-8 w-8 shrink-0"
-          disabled={isConverting || isLoading}
-          title={isConverting ? "Procesando audio..." : "Enviar audio"}
+          disabled={isConverting || isLoading || isSending}
+          title={isConverting ? "Procesando audio..." : isSending ? "Enviando audio..." : "Enviar audio"}
         >
-          {isConverting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {isConverting || isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </div>
     );

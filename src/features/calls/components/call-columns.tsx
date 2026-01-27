@@ -8,6 +8,7 @@ import { ArrowUpDown, Phone, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { AppointmentIndicator } from "@/features/appointments";
 import type { CallDetailed } from "../types/call.types";
 import {
   formatCallDuration,
@@ -23,12 +24,13 @@ import {
 
 interface ColumnOptions {
   onSort?: (columnId: string) => void;
+  showAppointments?: boolean;
 }
 
 export function getCallColumns(options: ColumnOptions = {}): ColumnDef<CallDetailed>[] {
-  const { onSort } = options;
+  const { onSort, showAppointments = false } = options;
 
-  return [
+  const columns: ColumnDef<CallDetailed>[] = [
     {
       accessorKey: "call_datetime",
       header: ({ column }) => (
@@ -144,6 +146,28 @@ export function getCallColumns(options: ColumnOptions = {}): ColumnDef<CallDetai
       },
     },
   ];
+
+  // Add appointments column if enabled
+  if (showAppointments) {
+    // Insert after contact_name column (index 1)
+    columns.splice(2, 0, {
+      id: "appointments",
+      header: () => <span className="text-sm">Citas</span>,
+      cell: ({ row }) => {
+        const contactId = row.original.contact_id;
+        if (!contactId) return null;
+        return (
+          <AppointmentIndicator
+            contactId={contactId}
+            size="sm"
+            showTooltip
+          />
+        );
+      },
+    });
+  }
+
+  return columns;
 }
 
 export const callColumns = getCallColumns();

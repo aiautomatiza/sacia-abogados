@@ -32,6 +32,7 @@ interface Props {
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  onRemoveTeamState?: (conversationId: string) => void;
 }
 
 type SortField = "last_message" | "unread_first" | "name" | "created_at";
@@ -48,6 +49,7 @@ export function ConversationsSidebar({
   hasNextPage = false,
   isFetchingNextPage = false,
   onLoadMore,
+  onRemoveTeamState,
 }: Props) {
   const [searchQuery, setSearchQuery] = useState(filters.search || "");
   const [showFilters, setShowFilters] = useState(false);
@@ -289,6 +291,7 @@ export function ConversationsSidebar({
                     isSelected={isSelected}
                     hasUnread={hasUnread}
                     onSelect={onSelect}
+                    onRemoveTeamState={onRemoveTeamState}
                   />
                 </div>
               );

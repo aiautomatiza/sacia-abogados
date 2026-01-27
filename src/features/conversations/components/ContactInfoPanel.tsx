@@ -10,7 +10,8 @@
  * - Sin cambios en estructura general
  */
 
-import { X, Phone, Calendar, MapPin, User, Tag } from "lucide-react";
+import { useState } from "react";
+import { X, Phone, Calendar, MapPin, User, Tag, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,6 +23,13 @@ import { EditableContactField } from "./contact-info/EditableContactField";
 import { TenantCommentsDisplay } from "./contact-info/ClinicCommentsDisplay";
 import { TagSelector } from "./contact-info/TagSelector";
 import { useCustomFields } from "@/features/contacts/hooks/useCustomFields";
+import { useAppointmentsEnabled } from "@/hooks/useTenantSettings";
+import {
+  ContactUpcomingAppointments,
+  AppointmentFormDialog,
+  AppointmentDetailModal,
+} from "@/features/appointments";
+import type { AppointmentDetailed } from "@/features/appointments";
 import type { ConversationWithContact } from "../types";
 
 interface Props {
@@ -34,6 +42,11 @@ interface Props {
 export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpdateTags }: Props) {
   const { contact } = conversation;
   const { data: customFields = [] } = useCustomFields();
+  const { isEnabled: appointmentsEnabled } = useAppointmentsEnabled();
+
+  // Estado para citas
+  const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentDetailed | null>(null);
 
   const handleUpdateField = async (field: string, value: any) => {
     if (!onUpdateContact) return;
@@ -209,10 +222,48 @@ export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpd
 
           <Separator />
 
+          {/* Citas - Solo si el módulo está habilitado */}
+          {appointmentsEnabled && (
+            <>
+              <ContactFieldGroup title="Citas" icon={<CalendarDays className="h-4 w-4" />}>
+                <ContactUpcomingAppointments
+                  contactId={contact.id}
+                  limit={3}
+                  onCreateClick={() => setIsAppointmentFormOpen(true)}
+                  onAppointmentClick={(apt) => setSelectedAppointment(apt)}
+                  showHeader={false}
+                  compact
+                />
+              </ContactFieldGroup>
+              <Separator />
+            </>
+          )}
+
           {/* Tenant Comments */}
           <TenantCommentsDisplay contactId={contact.id} tenantId={conversation.tenant_id} />
         </div>
       </ScrollArea>
+
+      {/* Diálogos de citas */}
+      {appointmentsEnabled && (
+        <>
+          <AppointmentFormDialog
+            open={isAppointmentFormOpen}
+            onOpenChange={setIsAppointmentFormOpen}
+            preSelectedContactId={contact.id}
+            preSelectedContactName={contact.nombre}
+            preSelectedContactPhone={contact.numero}
+          />
+
+          <AppointmentDetailModal
+            appointment={selectedAppointment}
+            open={!!selectedAppointment}
+            onOpenChange={(open) => {
+              if (!open) setSelectedAppointment(null);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

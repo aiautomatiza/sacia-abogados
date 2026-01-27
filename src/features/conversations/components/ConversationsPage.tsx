@@ -107,6 +107,7 @@ interface Props {
   onArchiveConversation: (conversationId: string) => Promise<void>;
   onAssignConversation: (conversationId: string, userId: string | null) => Promise<void>;
   onCreateConversation: (input: { contact_id: string; channel: string }) => Promise<void>;
+  onRemoveTeamState?: (conversationId: string) => Promise<void>;
 
   contacts: any[];
   currentUserId: string | null;
@@ -127,6 +128,7 @@ export function ConversationsPage({
   onArchiveConversation,
   onAssignConversation,
   onCreateConversation,
+  onRemoveTeamState,
   contacts,
   currentUserId,
 }: Props) {
@@ -252,6 +254,7 @@ export function ConversationsPage({
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={handleLoadMore}
+            onRemoveTeamState={onRemoveTeamState}
           />
         </ResizablePanel>
 

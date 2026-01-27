@@ -6,6 +6,7 @@
  */
 
 import { memo } from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,7 @@ interface ConversationItemProps {
   isSelected: boolean;
   hasUnread: boolean;
   onSelect: (id: string) => void;
+  onRemoveTeamState?: (conversationId: string) => void;
 }
 
 export const ConversationItem = memo(
@@ -42,6 +44,7 @@ export const ConversationItem = memo(
     isSelected,
     hasUnread,
     onSelect,
+    onRemoveTeamState,
   }: ConversationItemProps) {
     const { prefetchConversation } = usePrefetchConversation();
 
@@ -119,6 +122,27 @@ export const ConversationItem = memo(
               {conversation.state === 'ia' && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
                   IA
+                </Badge>
+              )}
+
+              {conversation.state === 'equipo' && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 inline-flex items-center gap-0.5"
+                >
+                  Equipo
+                  {onRemoveTeamState && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveTeamState(conversation.id);
+                      }}
+                      className="ml-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
+                      title="Quitar estado de equipo"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                 </Badge>
               )}
 

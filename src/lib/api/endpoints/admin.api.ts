@@ -35,8 +35,11 @@ export interface TenantSettings {
   calls_phone_number: string | null;
   conversations_enabled: boolean;
   conversations_webhook_url: string | null;
+  appointments_enabled: boolean;
+  appointments_webhook_url: string | null;
   created_at: string;
   updated_at: string;
+  // Note: credentials are never returned from API for security
 }
 
 export interface CreateTenantInput {
@@ -55,10 +58,13 @@ export interface UpdateTenantSettingsInput {
   calls_phone_number?: string | null;
   conversations_enabled?: boolean;
   conversations_webhook_url?: string | null;
+  appointments_enabled?: boolean;
+  appointments_webhook_url?: string | null;
   credentials?: {
     whatsapp?: string | Record<string, any>;
     calls?: string | Record<string, any>;
     conversations?: string | Record<string, any>;
+    appointments?: string | Record<string, any>;
   };
 }
 

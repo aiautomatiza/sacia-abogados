@@ -1,6 +1,6 @@
 import {
   Users, Settings, LogOut,
-  ChevronLeft, ChevronRight, Send, MessageSquare, Phone
+  ChevronLeft, ChevronRight, Send, MessageSquare, Phone, CalendarDays
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,6 +57,14 @@ const navigationItems: NavigationItem[] = [
     group: 'Principal',
     roles: ['user_client', 'super_admin'],
     requiredModule: 'calls',
+  },
+  {
+    title: 'Citas',
+    url: '/appointments',
+    icon: CalendarDays,
+    group: 'Principal',
+    roles: ['user_client', 'super_admin'],
+    requiredModule: 'appointments',
   },
   {
     title: 'Configuración',

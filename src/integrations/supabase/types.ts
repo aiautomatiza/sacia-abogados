@@ -543,7 +543,9 @@ export type Database = {
       tenant_credentials: {
         Row: {
           calls_credential: string | null
+          conversations_credential: string | null
           created_at: string | null
+          encryption_version: number | null
           id: string
           tenant_id: string
           updated_at: string | null
@@ -551,7 +553,9 @@ export type Database = {
         }
         Insert: {
           calls_credential?: string | null
+          conversations_credential?: string | null
           created_at?: string | null
+          encryption_version?: number | null
           id?: string
           tenant_id: string
           updated_at?: string | null
@@ -559,7 +563,9 @@ export type Database = {
         }
         Update: {
           calls_credential?: string | null
+          conversations_credential?: string | null
           created_at?: string | null
+          encryption_version?: number | null
           id?: string
           tenant_id?: string
           updated_at?: string | null
@@ -575,8 +581,90 @@ export type Database = {
           },
         ]
       }
+      tenant_locations: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          code: string | null
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state_province: string | null
+          postal_code: string | null
+          country: string
+          latitude: number | null
+          longitude: number | null
+          phone: string | null
+          email: string | null
+          timezone: string
+          is_active: boolean
+          is_default: boolean
+          operating_hours: Json
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          code?: string | null
+          address_line1: string
+          address_line2?: string | null
+          city: string
+          state_province?: string | null
+          postal_code?: string | null
+          country?: string
+          latitude?: number | null
+          longitude?: number | null
+          phone?: string | null
+          email?: string | null
+          timezone?: string
+          is_active?: boolean
+          is_default?: boolean
+          operating_hours?: Json
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          code?: string | null
+          address_line1?: string
+          address_line2?: string | null
+          city?: string
+          state_province?: string | null
+          postal_code?: string | null
+          country?: string
+          latitude?: number | null
+          longitude?: number | null
+          phone?: string | null
+          email?: string | null
+          timezone?: string
+          is_active?: boolean
+          is_default?: boolean
+          operating_hours?: Json
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_settings: {
         Row: {
+          appointments_enabled: boolean | null
+          appointments_webhook_url: string | null
           calls_enabled: boolean | null
           calls_phone_number: string | null
           calls_webhook_url: string | null
@@ -588,6 +676,8 @@ export type Database = {
           whatsapp_webhook_url: string | null
         }
         Insert: {
+          appointments_enabled?: boolean | null
+          appointments_webhook_url?: string | null
           calls_enabled?: boolean | null
           calls_phone_number?: string | null
           calls_webhook_url?: string | null
@@ -599,6 +689,8 @@ export type Database = {
           whatsapp_webhook_url?: string | null
         }
         Update: {
+          appointments_enabled?: boolean | null
+          appointments_webhook_url?: string | null
           calls_enabled?: boolean | null
           calls_phone_number?: string | null
           calls_webhook_url?: string | null
@@ -615,6 +707,127 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: true
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointments: {
+        Row: {
+          id: string
+          tenant_id: string
+          type: Database["public"]["Enums"]["appointment_type"]
+          contact_id: string
+          agent_id: string | null
+          location_id: string | null
+          scheduled_at: string
+          duration_minutes: number
+          timezone: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          title: string | null
+          description: string | null
+          customer_notes: string | null
+          reminder_sent_at: string | null
+          confirmation_sent_at: string | null
+          call_phone_number: string | null
+          call_id: string | null
+          metadata: Json
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          cancelled_at: string | null
+          cancelled_reason: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          type: Database["public"]["Enums"]["appointment_type"]
+          contact_id: string
+          agent_id?: string | null
+          location_id?: string | null
+          scheduled_at: string
+          duration_minutes?: number
+          timezone?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          title?: string | null
+          description?: string | null
+          customer_notes?: string | null
+          reminder_sent_at?: string | null
+          confirmation_sent_at?: string | null
+          call_phone_number?: string | null
+          call_id?: string | null
+          metadata?: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          type?: Database["public"]["Enums"]["appointment_type"]
+          contact_id?: string
+          agent_id?: string | null
+          location_id?: string | null
+          scheduled_at?: string
+          duration_minutes?: number
+          timezone?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          title?: string | null
+          description?: string | null
+          customer_notes?: string | null
+          reminder_sent_at?: string | null
+          confirmation_sent_at?: string | null
+          call_phone_number?: string | null
+          call_id?: string | null
+          metadata?: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "crm_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -802,6 +1015,75 @@ export type Database = {
       }
     }
     Views: {
+      v_appointments_detailed: {
+        Row: {
+          id: string | null
+          tenant_id: string | null
+          type: Database["public"]["Enums"]["appointment_type"] | null
+          status: Database["public"]["Enums"]["appointment_status"] | null
+          scheduled_at: string | null
+          duration_minutes: number | null
+          timezone: string | null
+          title: string | null
+          description: string | null
+          customer_notes: string | null
+          call_phone_number: string | null
+          metadata: Json | null
+          created_at: string | null
+          updated_at: string | null
+          cancelled_at: string | null
+          cancelled_reason: string | null
+          reminder_sent_at: string | null
+          confirmation_sent_at: string | null
+          created_by: string | null
+          contact_id: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          contact_attributes: Json | null
+          agent_id: string | null
+          agent_email: string | null
+          location_id: string | null
+          location_name: string | null
+          location_address: string | null
+          location_city: string | null
+          location_phone: string | null
+          call_id: string | null
+          call_state: Database["public"]["Enums"]["call_state"] | null
+          call_duration: number | null
+          time_status: string | null
+          scheduled_end_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_crm_calls_detailed: {
         Row: {
           agent_email: string | null
@@ -853,6 +1135,86 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_appointments_stats: {
+        Args: {
+          p_tenant_id?: string
+          p_date_from?: string
+          p_date_to?: string
+          p_type?: Database["public"]["Enums"]["appointment_type"]
+          p_location_id?: string
+          p_agent_id?: string
+        }
+        Returns: {
+          total: number
+          scheduled: number
+          confirmed: number
+          completed: number
+          cancelled: number
+          no_show: number
+          in_progress: number
+          completion_rate: number
+          cancellation_rate: number
+          no_show_rate: number
+          calls_count: number
+          in_person_count: number
+          avg_duration_minutes: number
+        }[]
+      }
+      check_appointment_availability: {
+        Args: {
+          p_tenant_id: string
+          p_type: Database["public"]["Enums"]["appointment_type"]
+          p_scheduled_at: string
+          p_duration_minutes: number
+          p_agent_id?: string
+          p_location_id?: string
+          p_exclude_appointment_id?: string
+        }
+        Returns: boolean
+      }
+      get_contact_upcoming_appointments: {
+        Args: {
+          p_contact_id: string
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          tenant_id: string
+          type: Database["public"]["Enums"]["appointment_type"]
+          status: Database["public"]["Enums"]["appointment_status"]
+          scheduled_at: string
+          duration_minutes: number
+          timezone: string
+          title: string | null
+          description: string | null
+          customer_notes: string | null
+          call_phone_number: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+          cancelled_at: string | null
+          cancelled_reason: string | null
+          reminder_sent_at: string | null
+          confirmation_sent_at: string | null
+          created_by: string | null
+          contact_id: string
+          contact_name: string | null
+          contact_phone: string | null
+          contact_attributes: Json | null
+          agent_id: string | null
+          agent_email: string | null
+          location_id: string | null
+          location_name: string | null
+          location_address: string | null
+          location_city: string | null
+          location_phone: string | null
+          call_id: string | null
+          call_state: Database["public"]["Enums"]["call_state"] | null
+          call_duration: number | null
+          time_status: string
+          scheduled_end_at: string
+        }[]
+      }
       calculate_calls_stats: {
         Args: {
           p_date_from?: string
@@ -893,6 +1255,15 @@ export type Database = {
     }
     Enums: {
       app_role: "user_client" | "super_admin"
+      appointment_type: "call" | "in_person"
+      appointment_status:
+        | "scheduled"
+        | "confirmed"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+        | "no_show"
+        | "rescheduled"
       call_state:
         | "pending"
         | "completed"
@@ -1048,6 +1419,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user_client", "super_admin"],
+      appointment_type: ["call", "in_person"],
+      appointment_status: [
+        "scheduled",
+        "confirmed",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "no_show",
+        "rescheduled",
+      ],
       call_state: [
         "pending",
         "completed",

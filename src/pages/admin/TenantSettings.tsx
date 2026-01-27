@@ -14,9 +14,11 @@ interface TenantSettings {
   whatsapp_enabled: boolean;
   calls_enabled: boolean;
   conversations_enabled: boolean;
+  appointments_enabled: boolean;
   whatsapp_webhook_url: string;
   calls_webhook_url: string;
   conversations_webhook_url: string;
+  appointments_webhook_url: string;
   calls_phone_number: string;
 }
 
@@ -35,9 +37,11 @@ export default function TenantSettings() {
     whatsapp_enabled: false,
     calls_enabled: false,
     conversations_enabled: false,
+    appointments_enabled: false,
     whatsapp_webhook_url: '',
     calls_webhook_url: '',
     conversations_webhook_url: '',
+    appointments_webhook_url: '',
     calls_phone_number: '',
   });
   const [credentials, setCredentials] = useState<TenantCredentials>({
@@ -52,7 +56,18 @@ export default function TenantSettings() {
         setLoading(true);
         const data = await adminService.getTenantSettings(id!);
         if (data) {
-          setSettings(data);
+          // Convert null values to empty strings/false for controlled inputs
+          setSettings({
+            whatsapp_enabled: data.whatsapp_enabled ?? false,
+            calls_enabled: data.calls_enabled ?? false,
+            conversations_enabled: data.conversations_enabled ?? false,
+            appointments_enabled: data.appointments_enabled ?? false,
+            whatsapp_webhook_url: data.whatsapp_webhook_url ?? '',
+            calls_webhook_url: data.calls_webhook_url ?? '',
+            conversations_webhook_url: data.conversations_webhook_url ?? '',
+            appointments_webhook_url: data.appointments_webhook_url ?? '',
+            calls_phone_number: data.calls_phone_number ?? '',
+          });
         }
       } catch (error: any) {
         toast.error('Error al cargar configuración: ' + error.message);
@@ -360,6 +375,67 @@ export default function TenantSettings() {
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Citas Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Citas</CardTitle>
+              <CardDescription>
+                Configuración del módulo de citas (llamadas y presenciales)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="appointments-enabled">Habilitar Citas</Label>
+                <Switch
+                  id="appointments-enabled"
+                  checked={settings.appointments_enabled}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, appointments_enabled: checked })
+                  }
+                />
+              </div>
+
+              {settings.appointments_enabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="appointments-webhook">Webhook URL (opcional)</Label>
+                  <Input
+                    id="appointments-webhook"
+                    type="url"
+                    placeholder="https://..."
+                    value={settings.appointments_webhook_url}
+                    onChange={(e) =>
+                      setSettings({ ...settings, appointments_webhook_url: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Si se configura, se enviará una notificación a este webhook cuando se creen, modifiquen o cancelen citas.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Campañas Configuration - Derived from WhatsApp/Calls */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Campañas</CardTitle>
+              <CardDescription>
+                Módulo de campañas (WhatsApp y llamadas masivas)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Estado del módulo</Label>
+                <span className={`text-sm font-medium ${settings.whatsapp_enabled || settings.calls_enabled ? 'text-green-600' : 'text-muted-foreground'}`}>
+                  {settings.whatsapp_enabled || settings.calls_enabled ? 'Habilitado' : 'Deshabilitado'}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Las campañas se habilitan automáticamente cuando WhatsApp o Llamadas están activos.
+              </p>
             </CardContent>
           </Card>
 

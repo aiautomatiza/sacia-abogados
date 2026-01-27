@@ -9,6 +9,7 @@ import { setupGlobalErrorHandlers, reportComponentError } from "@/lib/utils/erro
 import Auth from "./pages/Auth";
 import Contacts from "./pages/Contacts";
 import Calls from "./pages/Calls";
+import Appointments from "./pages/Appointments";
 import ContactSettings from "./pages/ContactSettings";
 import Campaigns from "./pages/Campaigns";
 import NewCampaign from "./pages/NewCampaign";
@@ -106,6 +107,11 @@ const App = () => (
               <Route path="/calls" element={
                 <ModuleRoute module="calls">
                   <Calls />
+                </ModuleRoute>
+              } />
+              <Route path="/appointments" element={
+                <ModuleRoute module="appointments">
+                  <Appointments />
                 </ModuleRoute>
               } />
             </Route>

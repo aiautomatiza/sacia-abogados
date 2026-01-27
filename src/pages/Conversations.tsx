@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ConversationsPage,
   useInfiniteConversations,
@@ -10,6 +11,7 @@ import {
   useFileUpload,
   useConversationActions,
   updateConversationTags,
+  updateConversationState,
   assignConversation,
   createConversation,
   markAsRead,
@@ -37,6 +39,7 @@ const toServiceFilters = (filters: LocalConversationFilters): ConversationFilter
 };
 
 export default function Conversations() {
+  const queryClient = useQueryClient();
   const { urlConversationId, setUrlConversationId } = useConversationsUrlState();
   const { user, scope } = useAuth();
   const { tenantId } = useProfile();
@@ -85,11 +88,28 @@ export default function Conversations() {
   // Handle conversation selection - update URL and mark as read
   const handleConversationSelect = useCallback((id: string | null) => {
     setUrlConversationId(id);
-    if (id && scope) {
-      // Marcar como leída inmediatamente (estilo WhatsApp)
+    if (id && scope && tenantId) {
+      // OPTIMISTIC UPDATE: Actualizar cache inmediatamente antes de llamar al servidor
+      queryClient.setQueryData(
+        ["conversations", "infinite", tenantId, toServiceFilters(filters)],
+        (old: any) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => ({
+              ...page,
+              conversations: page.conversations.map((conv: any) =>
+                conv.id === id ? { ...conv, unread_count: 0 } : conv
+              ),
+            })),
+          };
+        }
+      );
+
+      // Marcar como leída en el servidor (no esperamos respuesta para UX instantánea)
       markAsRead(id, scope).catch(console.error);
     }
-  }, [setUrlConversationId, scope]);
+  }, [setUrlConversationId, scope, tenantId, queryClient, filters]);
 
   // Adapter for infinite conversations hook
   const useInfiniteConversationsAdapter = (params: any) => {
@@ -125,6 +145,14 @@ export default function Conversations() {
     return result?.file_url || "";
   }, [uploadFile]);
 
+  // Handle removing team state from conversation
+  const handleRemoveTeamState = useCallback(async (conversationId: string) => {
+    if (!scope) return;
+    await updateConversationState(conversationId, null, scope);
+    // Invalidate conversations cache to update UI
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }, [scope, queryClient]);
+
   return (
     <ConversationsPage
       useConversations={useInfiniteConversationsAdapter}
@@ -150,6 +178,7 @@ export default function Conversations() {
           channel: input.channel as "whatsapp" | "instagram" | "webchat" | "email",
         });
       }}
+      onRemoveTeamState={handleRemoveTeamState}
       contacts={contactsData?.data || []}
       currentUserId={user?.id || null}
     />

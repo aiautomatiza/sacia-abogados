@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { StatusBadge } from './StatusBadge';
 import { useActiveContactStatuses } from '../hooks/useContactStatuses';
+import { useAppointmentsEnabled } from '@/hooks/useTenantSettings';
+import { AppointmentIndicator, QuickAppointmentButton } from '@/features/appointments';
 import type { Contact, CustomField } from '../types';
 
 interface ContactsTableProps {
@@ -26,6 +28,7 @@ export function ContactsTable({
   onDelete,
 }: ContactsTableProps) {
   const { data: statuses = [] } = useActiveContactStatuses();
+  const { isEnabled: appointmentsEnabled } = useAppointmentsEnabled();
   const allSelected = contacts.length > 0 && selectedIds.length === contacts.length;
 
   // Helper to get status object from status_id
@@ -84,6 +87,9 @@ export function ContactsTable({
               <TableHead className="bg-muted">Número</TableHead>
               <TableHead className="bg-muted">Nombre</TableHead>
               <TableHead className="bg-muted">Estado</TableHead>
+              {appointmentsEnabled && (
+                <TableHead className="bg-muted w-24">Citas</TableHead>
+              )}
               {customFields.map((field) => (
                 <TableHead key={field.id} className="bg-muted">{field.field_label}</TableHead>
               ))}
@@ -94,7 +100,10 @@ export function ContactsTable({
           <TableBody>
             {contacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6 + customFields.length} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={6 + customFields.length + (appointmentsEnabled ? 1 : 0)}
+                  className="text-center text-muted-foreground py-8"
+                >
                   No hay contactos. Crea uno nuevo o importa desde CSV.
                 </TableCell>
               </TableRow>
@@ -113,6 +122,20 @@ export function ContactsTable({
                   <TableCell>
                     <StatusBadge status={getStatus(contact.status_id)} />
                   </TableCell>
+                  {appointmentsEnabled && (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <AppointmentIndicator contactId={contact.id} size="sm" />
+                        <QuickAppointmentButton
+                          contactId={contact.id}
+                          contactName={contact.nombre}
+                          contactPhone={contact.numero}
+                          variant="ghost"
+                          size="icon"
+                        />
+                      </div>
+                    </TableCell>
+                  )}
                   {customFields.map((field) => (
                     <TableCell key={field.id}>
                       {formatValue(contact.attributes[field.field_name], field.field_type)}

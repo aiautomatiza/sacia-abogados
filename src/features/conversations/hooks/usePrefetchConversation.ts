@@ -5,7 +5,7 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useProfile } from '@/hooks/useProfile';
+import { useAuth } from '@/contexts/auth-context';
 import { listMessages } from '../services/conversation.service';
 import * as conversationsApi from '@/lib/api/endpoints/conversations.api';
 
@@ -13,7 +13,7 @@ const USE_API_GATEWAY = import.meta.env.VITE_USE_API_GATEWAY === 'true';
 
 export function usePrefetchConversation() {
   const queryClient = useQueryClient();
-  const { scope } = useProfile();
+  const { scope } = useAuth();
 
   const prefetchConversation = (conversationId: string) => {
     if (!USE_API_GATEWAY && !scope) return;

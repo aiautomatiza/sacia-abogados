@@ -40,6 +40,16 @@ export const conversationStatuses = [
 ] as const;
 
 /**
+ * Valid message sender types (must match database enum)
+ */
+export const messageSenderTypes = [
+  'contact',
+  'agent',
+  'system',
+  'ai'
+] as const;
+
+/**
  * Schema for sending a message
  */
 export const sendMessageSchema = z.object({
@@ -47,7 +57,7 @@ export const sendMessageSchema = z.object({
     .string()
     .uuid('Invalid conversation ID'),
   sender_type: z
-    .enum(['agent', 'customer', 'system']),
+    .enum(messageSenderTypes),
   sender_id: z
     .string()
     .uuid('Invalid sender ID')

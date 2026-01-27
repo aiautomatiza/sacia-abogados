@@ -96,23 +96,26 @@ export function MessagesPanel({ messages, currentUserId, isLoading = false, onLo
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (messages.length > prevMessagesLengthRef.current && messagesWithDates.length > 0) {
-      // Use setTimeout to ensure virtualizer is ready
+      // Use setTimeout + queueMicrotask to ensure scroll happens outside React's render cycle
       const timer = setTimeout(() => {
-        try {
-          // Verify container exists and has size
-          if (parentRef.current && parentRef.current.offsetHeight > 0) {
-            const targetIndex = messagesWithDates.length - 1;
-            // Verify index is valid
-            if (targetIndex >= 0 && targetIndex < messagesWithDates.length) {
-              virtualizer.scrollToIndex(targetIndex, {
-                align: 'end',
-                behavior: 'smooth',
-              });
+        queueMicrotask(() => {
+          try {
+            // Verify container exists and has size
+            if (parentRef.current && parentRef.current.offsetHeight > 0) {
+              const targetIndex = messagesWithDates.length - 1;
+              // Verify index is valid
+              if (targetIndex >= 0 && targetIndex < messagesWithDates.length) {
+                // Use 'auto' instead of 'smooth' to avoid flushSync issues with dynamic sizes
+                virtualizer.scrollToIndex(targetIndex, {
+                  align: 'end',
+                  behavior: 'auto',
+                });
+              }
             }
+          } catch (error) {
+            console.error('Error scrolling to message:', error);
           }
-        } catch (error) {
-          console.error('Error scrolling to message:', error);
-        }
+        });
       }, 100);
 
       return () => clearTimeout(timer);

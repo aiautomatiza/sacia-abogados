@@ -12,6 +12,7 @@ import { tagsRoutes } from './tags.routes.ts';
 import { campaignsRoutes } from './campaigns.routes.ts';
 import { integrationsRoutes } from './integrations.routes.ts';
 import { adminRoutes } from './admin.routes.ts';
+import { appointmentsRoutes } from './appointments.routes.ts';
 import { adminMiddleware } from '../middleware/auth.ts';
 
 /**
@@ -45,6 +46,10 @@ export function registerRoutes(app: Hono) {
   // Phase 6: Integrations routes (ACTIVE)
   app.route('/api/integrations', integrationsRoutes);
   console.log('[routes] ✅ Integrations routes registered');
+
+  // Phase 8: Appointments routes (ACTIVE)
+  app.route('/api/appointments', appointmentsRoutes);
+  console.log('[routes] ✅ Appointments routes registered');
 
   // Phase 7: Admin routes (ACTIVE - Super Admin only)
   // Apply admin middleware to all /api/admin/* routes

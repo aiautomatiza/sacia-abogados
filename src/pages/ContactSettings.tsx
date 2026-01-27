@@ -9,11 +9,13 @@ import { ArrowLeft } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomFieldsTab, StatusesTab } from '@/features/contacts';
+import { LocationsManager } from '@/features/locations';
+import { useAppointmentsEnabled } from '@/hooks/useTenantSettings';
 
 /**
  * Valid tab values
  */
-type TabValue = 'fields' | 'statuses';
+type TabValue = 'fields' | 'statuses' | 'locations';
 
 const DEFAULT_TAB: TabValue = 'fields';
 
@@ -40,10 +42,13 @@ export default function ContactSettings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as TabValue) || DEFAULT_TAB;
 
+  const { isEnabled: appointmentsEnabled } = useAppointmentsEnabled();
+
   // Validate and set default tab if invalid
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (!tab || (tab !== 'fields' && tab !== 'statuses')) {
+    const validTabs = ['fields', 'statuses', 'locations'];
+    if (!tab || !validTabs.includes(tab)) {
       setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -66,7 +71,7 @@ export default function ContactSettings() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
           <p className="text-muted-foreground mt-1">
-            Configura los campos y estados para la gestión de tus contactos
+            Configura los campos, estados y sedes para la gestión de contactos y citas
           </p>
         </div>
       </div>
@@ -76,6 +81,9 @@ export default function ContactSettings() {
         <TabsList>
           <TabsTrigger value="fields">Campos Personalizados</TabsTrigger>
           <TabsTrigger value="statuses">Estados</TabsTrigger>
+          {appointmentsEnabled && (
+            <TabsTrigger value="locations">Sedes</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="fields" className="space-y-4">
@@ -85,6 +93,12 @@ export default function ContactSettings() {
         <TabsContent value="statuses" className="space-y-4">
           <StatusesTab />
         </TabsContent>
+
+        {appointmentsEnabled && (
+          <TabsContent value="locations" className="space-y-4">
+            <LocationsManager />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

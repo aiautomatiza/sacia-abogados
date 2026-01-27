@@ -346,6 +346,26 @@ export const updateConversationStatus = async (
   }
 };
 
+export const updateConversationState = async (
+  conversationId: string,
+  state: string | null,
+  scope: UserScope
+): Promise<void> => {
+  const { error } = await supabase
+    .from("conversations")
+    .update({
+      state,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId)
+    .eq("tenant_id", scope.tenantId);
+
+  if (error) {
+    console.error("Error updating conversation state:", error);
+    throw error;
+  }
+};
+
 export const assignConversation = async (
   conversationId: string,
   userId: string | null,
@@ -564,17 +584,52 @@ export const sendMessage = async (
   }
 
   if (message) {
-    supabase.functions
-      .invoke("send-conversation-message", {
-        body: {
-          message_id: message.id,
-          conversation_id: validated.conversation_id,
-          phone_number_id: conversation?.whatsapp_number_id || null, // Include phone_number_id
-        },
-      })
-      .catch((err) => {
-        console.error("Error invoking send-conversation-message:", err);
-      });
+    // If an agent sends a message, mark conversation as "equipo" (team-managed)
+    if (validated.sender_type === "agent") {
+      const { error: stateError } = await supabase
+        .from("conversations")
+        .update({
+          state: "equipo",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", validated.conversation_id)
+        .eq("tenant_id", scope.tenantId);
+
+      if (stateError) {
+        console.error("[SendMessage] Error updating conversation state to 'equipo':", stateError);
+        // Don't throw - this is a non-critical update
+      }
+    }
+
+    // Call Edge Function to send message to external channel (WhatsApp, etc.)
+    // Note: Supabase client automatically includes the auth token
+    const payload = {
+      message_id: message.id,
+      conversation_id: validated.conversation_id,
+      phone_number_id: conversation?.whatsapp_number_id || null,
+    };
+
+    console.log("[SendMessage] Invoking Edge Function with payload:", payload);
+
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions
+        .invoke("send-conversation-message", {
+          body: payload,
+        });
+
+      if (fnError) {
+        console.error("[SendMessage] Edge Function error:", fnError);
+        console.error("[SendMessage] Error details:", {
+          name: fnError.name,
+          message: fnError.message,
+          context: (fnError as any).context,
+        });
+      } else {
+        console.log("[SendMessage] Edge Function response:", fnData);
+      }
+    } catch (err) {
+      console.error("[SendMessage] Exception invoking Edge Function:", err);
+    }
   }
 
   return message as MessageWithSender;

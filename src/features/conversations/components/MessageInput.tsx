@@ -61,6 +61,12 @@ export function MessageInput({ conversation, currentUserId, onSendMessage, onUpl
       if (selectedFile) {
         setIsUploading(true);
         fileUrl = await onUploadFile(selectedFile);
+
+        // Validate upload was successful
+        if (!fileUrl) {
+          throw new Error("Error al subir el archivo");
+        }
+
         fileName = selectedFile.name;
         fileType = selectedFile.type;
         fileSize = selectedFile.size;
@@ -119,10 +125,15 @@ export function MessageInput({ conversation, currentUserId, onSendMessage, onUpl
     }
   };
 
-  const handleAudioRecorded = async (audioFile: File) => {
+  const handleAudioRecorded = async (audioFile: File): Promise<void> => {
     try {
       setIsUploading(true);
       const fileUrl = await onUploadFile(audioFile);
+
+      // Validate upload was successful
+      if (!fileUrl) {
+        throw new Error("Error al subir el archivo de audio");
+      }
 
       await onSendMessage({
         conversation_id: conversation.id,
@@ -138,6 +149,8 @@ export function MessageInput({ conversation, currentUserId, onSendMessage, onUpl
       setShowAudioRecorder(false);
     } catch (error) {
       console.error("Error sending audio:", error);
+      // Re-throw to let AudioRecorder know the send failed
+      throw error;
     } finally {
       setIsUploading(false);
     }

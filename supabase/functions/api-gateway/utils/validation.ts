@@ -287,6 +287,7 @@ export const createTenantSchema = z.object({
 /**
  * Update Tenant Settings schema
  * Partial update - all fields are optional
+ * Note: campaigns_enabled is derived from whatsapp_enabled OR calls_enabled
  */
 export const updateTenantSettingsSchema = z.object({
   whatsapp_enabled: z.boolean().optional(),
@@ -296,10 +297,13 @@ export const updateTenantSettingsSchema = z.object({
   calls_phone_number: z.string().nullable().optional(),
   conversations_enabled: z.boolean().optional(),
   conversations_webhook_url: z.string().nullable().optional(),
+  appointments_enabled: z.boolean().optional(),
+  appointments_webhook_url: z.string().nullable().optional(),
   credentials: z.object({
     whatsapp: z.union([z.string(), z.record(z.any())]).optional(),
     calls: z.union([z.string(), z.record(z.any())]).optional(),
     conversations: z.union([z.string(), z.record(z.any())]).optional(),
+    appointments: z.union([z.string(), z.record(z.any())]).optional(),
   }).optional(),
 });
 
@@ -309,4 +313,102 @@ export const updateTenantSettingsSchema = z.object({
 export const assignUserToTenantSchema = z.object({
   user_id: z.string().uuid('Invalid user ID'),
   tenant_id: z.string().uuid('Invalid tenant ID'),
+});
+
+// ============================================================================
+// APPOINTMENTS VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Appointment type enum
+ */
+export const appointmentTypeSchema = z.enum(['call', 'in_person']);
+
+/**
+ * Appointment status enum
+ */
+export const appointmentStatusSchema = z.enum([
+  'scheduled',
+  'confirmed',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'no_show',
+  'rescheduled',
+]);
+
+/**
+ * Create Appointment schema
+ * Validates input for creating a new appointment
+ *
+ * Constraints:
+ * - type='call' requires agent_id
+ * - type='in_person' requires location_id
+ */
+export const createAppointmentSchema = z
+  .object({
+    type: appointmentTypeSchema,
+    contact_id: z.string().uuid('Invalid contact ID'),
+    scheduled_at: z.string().datetime({ message: 'Invalid datetime format (ISO 8601 required)' }),
+    duration_minutes: z.number().int().min(5).max(480).default(30),
+    timezone: z.string().max(50).default('Europe/Madrid'),
+
+    // Conditional fields based on type
+    agent_id: z.string().uuid('Invalid agent ID').optional(),
+    location_id: z.string().uuid('Invalid location ID').optional(),
+
+    // Optional info
+    title: z.string().max(200).optional(),
+    description: z.string().max(2000).optional(),
+    customer_notes: z.string().max(2000).optional(),
+    call_phone_number: z.string().max(20).optional(),
+
+    // Metadata
+    metadata: z.record(z.any()).optional(),
+
+    // Skip availability check (for admin overrides)
+    skip_availability_check: z.boolean().default(false),
+  })
+  .refine(
+    (data) => {
+      if (data.type === 'call') return !!data.agent_id;
+      if (data.type === 'in_person') return !!data.location_id;
+      return false;
+    },
+    {
+      message: "Appointments of type 'call' require agent_id, type 'in_person' require location_id",
+      path: ['type'],
+    }
+  );
+
+/**
+ * Update Appointment schema
+ * Partial update - all fields are optional
+ */
+export const updateAppointmentSchema = z.object({
+  scheduled_at: z.string().datetime().optional(),
+  duration_minutes: z.number().int().min(5).max(480).optional(),
+  timezone: z.string().max(50).optional(),
+  status: appointmentStatusSchema.optional(),
+  agent_id: z.string().uuid().nullable().optional(),
+  location_id: z.string().uuid().nullable().optional(),
+  title: z.string().max(200).nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  customer_notes: z.string().max(2000).nullable().optional(),
+  call_phone_number: z.string().max(20).nullable().optional(),
+  metadata: z.record(z.any()).optional(),
+  cancelled_reason: z.string().max(500).optional(),
+});
+
+/**
+ * Check Availability schema
+ * Validates input for checking appointment slot availability
+ */
+export const checkAvailabilitySchema = z.object({
+  type: appointmentTypeSchema,
+  scheduled_at: z.string().datetime({ message: 'Invalid datetime format (ISO 8601 required)' }),
+  duration_minutes: z.number().int().min(5).max(480).default(30),
+  agent_id: z.string().uuid().optional(),
+  location_id: z.string().uuid().optional(),
+  exclude_appointment_id: z.string().uuid().optional(),
 });

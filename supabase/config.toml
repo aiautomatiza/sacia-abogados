@@ -36,3 +36,9 @@ verify_jwt = false
 
 [functions.handle-oauth-callback]
 verify_jwt = false
+
+[functions.send-conversation-message]
+verify_jwt = false  # Uses service role internally, no JWT verification needed
+
+[functions.send-template-message]
+verify_jwt = false  # Uses service role internally
