@@ -6,7 +6,7 @@ import { useAuth } from "./useAuth";
  * Hook to get the current user's profile and tenant information
  */
 export const useProfile = () => {
-  const { user } = useAuth();
+  const { user, loading: isAuthLoading } = useAuth();
 
   const query = useQuery({
     queryKey: ["profile", user?.id],
@@ -28,7 +28,8 @@ export const useProfile = () => {
   return {
     profile: query.data,
     tenantId: query.data?.tenant_id || null,
-    isLoading: query.isLoading,
+    // Considerar auth cargando O profile cargando O esperando datos
+    isLoading: isAuthLoading || query.isLoading || (!!user?.id && !query.data),
     error: query.error,
   };
 };

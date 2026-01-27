@@ -1,9 +1,7 @@
 import { MessageCircle, Phone, Lock } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useTenantSettings } from '@/hooks/useTenantSettings';
 
 interface ChannelSelectorProps {
   selectedChannel: 'whatsapp' | 'llamadas' | null;
@@ -11,56 +9,14 @@ interface ChannelSelectorProps {
 }
 
 export function ChannelSelector({ selectedChannel, onSelectChannel }: ChannelSelectorProps) {
-  const [channelsEnabled, setChannelsEnabled] = useState({
-    whatsapp: true,
-    calls: true,
-  });
-  const [loading, setLoading] = useState(true);
+  const { data: settings, isLoading } = useTenantSettings();
 
-  useEffect(() => {
-    const fetchChannelSettings = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const channelsEnabled = {
+    whatsapp: settings?.whatsapp_enabled ?? false,
+    calls: settings?.calls_enabled ?? false,
+  };
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('tenant_id')
-          .eq('id', user.id)
-          .single();
-
-        if (!profile?.tenant_id) {
-          setLoading(false);
-          return;
-        }
-
-        const { data: settings, error } = await supabase
-          .from('tenant_settings')
-          .select('whatsapp_enabled, calls_enabled')
-          .eq('tenant_id', profile.tenant_id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching tenant settings:', error);
-          toast.error('Error al cargar configuración de canales');
-        } else if (settings) {
-          setChannelsEnabled({
-            whatsapp: settings.whatsapp_enabled,
-            calls: settings.calls_enabled,
-          });
-        }
-      } catch (error: any) {
-        console.error('Error:', error);
-        toast.error('Error al verificar canales disponibles');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchChannelSettings();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

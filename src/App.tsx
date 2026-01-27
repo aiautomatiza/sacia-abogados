@@ -21,6 +21,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 import { UserClientRoute } from "./components/UserClientRoute";
+import { ModuleRoute } from "./components/ModuleRoute";
 import { AdminLayout } from "@/features/admin";
 import TenantManagement from "./pages/admin/TenantManagement";
 import TenantSettings from "./pages/admin/TenantSettings";
@@ -80,13 +81,33 @@ const App = () => (
               </ProtectedRoute>
             }>
             <Route path="/" element={<Navigate to="/contacts" replace />} />
-              <Route path="/conversations" element={<Conversations />} />
+              <Route path="/conversations" element={
+                <ModuleRoute module="conversations">
+                  <Conversations />
+                </ModuleRoute>
+              } />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/contacts/settings" element={<ContactSettings />} />
-              <Route path="/campaigns" element={<Campaigns />} />
-              <Route path="/campaigns/new" element={<NewCampaign />} />
-              <Route path="/campaigns/:id" element={<CampaignDetail />} />
-              <Route path="/calls" element={<Calls />} />
+              <Route path="/campaigns" element={
+                <ModuleRoute module="campaigns">
+                  <Campaigns />
+                </ModuleRoute>
+              } />
+              <Route path="/campaigns/new" element={
+                <ModuleRoute module="campaigns">
+                  <NewCampaign />
+                </ModuleRoute>
+              } />
+              <Route path="/campaigns/:id" element={
+                <ModuleRoute module="campaigns">
+                  <CampaignDetail />
+                </ModuleRoute>
+              } />
+              <Route path="/calls" element={
+                <ModuleRoute module="calls">
+                  <Calls />
+                </ModuleRoute>
+              } />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

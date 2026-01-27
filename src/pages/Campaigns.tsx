@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -18,21 +18,55 @@ import { useCampaignsEnabled } from "@/hooks/useTenantSettings";
 export default function Campaigns() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<CampaignFilters>({});
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const { enabled: campaignsEnabled, whatsappEnabled, callsEnabled, isLoading: loadingSettings } = useCampaignsEnabled();
+
+  // Determinar tabs disponibles según canales habilitados
+  const availableTabs = useMemo(() => {
+    const tabs: Array<{ value: string; label: string }> = [];
+
+    // Solo mostrar "Todas" si hay más de un canal habilitado
+    if (whatsappEnabled && callsEnabled) {
+      tabs.push({ value: "all", label: "Todas" });
+    }
+
+    if (whatsappEnabled) {
+      tabs.push({ value: "whatsapp", label: "WhatsApp" });
+    }
+
+    if (callsEnabled) {
+      tabs.push({ value: "llamadas", label: "Llamadas" });
+    }
+
+    return tabs;
+  }, [whatsappEnabled, callsEnabled]);
+
+  // Tab por defecto: si solo hay un canal, usar ese; si hay varios, usar "all"
+  const defaultTab = availableTabs.length === 1 ? availableTabs[0].value : "all";
+
+  // Sincronizar tab activo cuando los settings carguen
+  useEffect(() => {
+    if (!loadingSettings && availableTabs.length > 0 && activeTab === null) {
+      setActiveTab(defaultTab);
+    }
+  }, [loadingSettings, availableTabs, defaultTab, activeTab]);
+
+  // Calcular filtros basados en el tab activo
+  const filters: CampaignFilters = useMemo(() => {
+    if (!activeTab || activeTab === "all") {
+      return {};
+    }
+    return { channel: activeTab as "whatsapp" | "llamadas" };
+  }, [activeTab]);
 
   const { data, isLoading } = useCampaigns(filters, page);
   const campaigns = data?.data || [];
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / 50);
 
-  const handleChannelFilter = (channel: "all" | "whatsapp" | "llamadas") => {
+  const handleChannelFilter = (channel: string) => {
     setPage(1);
-    if (channel === "all") {
-      setFilters({});
-    } else {
-      setFilters({ channel });
-    }
+    setActiveTab(channel);
   };
 
   // Show disabled message if no campaigns are enabled
@@ -79,24 +113,20 @@ export default function Campaigns() {
         }
       />
 
-      <Tabs defaultValue="all" onValueChange={(value) => handleChannelFilter(value as any)}>
+      <Tabs value={activeTab || defaultTab} onValueChange={handleChannelFilter}>
         <TabsList className="mb-6">
-          <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="llamadas">Llamadas</TabsTrigger>
+          {availableTabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          <CampaignsTable campaigns={campaigns} isLoading={isLoading} />
-        </TabsContent>
-
-        <TabsContent value="whatsapp" className="space-y-4">
-          <CampaignsTable campaigns={campaigns} isLoading={isLoading} />
-        </TabsContent>
-
-        <TabsContent value="llamadas" className="space-y-4">
-          <CampaignsTable campaigns={campaigns} isLoading={isLoading} />
-        </TabsContent>
+        {availableTabs.map((tab) => (
+          <TabsContent key={tab.value} value={tab.value} className="space-y-4">
+            <CampaignsTable campaigns={campaigns} isLoading={isLoading} />
+          </TabsContent>
+        ))}
       </Tabs>
 
       {totalPages > 1 && (

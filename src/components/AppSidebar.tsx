@@ -1,11 +1,11 @@
 import {
   Users, Settings, LogOut,
-  ChevronLeft, ChevronRight, Send, MessageSquare, Phone, Hash
+  ChevronLeft, ChevronRight, Send, MessageSquare, Phone
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
-import { useCampaignsEnabled } from '@/hooks/useTenantSettings';
+import { useModuleAccess } from '@/hooks/useTenantSettings';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import logoAIAutomatiza from '@/assets/logo-aiautomatiza.png';
@@ -21,7 +21,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -34,6 +33,7 @@ const navigationItems: NavigationItem[] = [
     icon: MessageSquare,
     group: 'Principal',
     roles: ['user_client', 'super_admin'],
+    requiredModule: 'conversations',
   },
   {
     title: 'Contactos',
@@ -48,6 +48,7 @@ const navigationItems: NavigationItem[] = [
     icon: Send,
     group: 'Principal',
     roles: ['user_client', 'super_admin'],
+    requiredModule: 'campaigns',
   },
   {
     title: 'Llamadas',
@@ -55,6 +56,7 @@ const navigationItems: NavigationItem[] = [
     icon: Phone,
     group: 'Principal',
     roles: ['user_client', 'super_admin'],
+    requiredModule: 'calls',
   },
   {
     title: 'Configuración',
@@ -68,7 +70,7 @@ const navigationItems: NavigationItem[] = [
 export function AppSidebar() {
   const { signOut } = useAuth();
   const { role } = useRole();
-  const { enabled: campaignsEnabled, isLoading: loadingCampaigns } = useCampaignsEnabled();
+  const { isLoading: loadingModules, isModuleEnabled } = useModuleAccess();
   const navigate = useNavigate();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
@@ -79,22 +81,22 @@ export function AppSidebar() {
     navigate('/auth');
   };
 
-  // Filtrar items según el rol del usuario y permisos de campañas
-  const filteredNavigationItems = navigationItems.filter(
-    (item) => {
-      // Filtrar por rol
-      if (item.roles && role && !item.roles.includes(role)) {
-        return false;
-      }
-
-      // Si es el item de Campañas, verificar si está habilitado
-      if (item.url === '/campaigns') {
-        return !loadingCampaigns && campaignsEnabled;
-      }
-
-      return true;
+  // Filtrar items según el rol del usuario y módulos habilitados del tenant
+  const filteredNavigationItems = navigationItems.filter((item) => {
+    // Filtrar por rol
+    if (item.roles && role && !item.roles.includes(role)) {
+      return false;
     }
-  );
+
+    // Si requiere un módulo específico, verificar si está habilitado
+    if (item.requiredModule) {
+      // No mostrar mientras carga para evitar flash
+      if (loadingModules) return false;
+      return isModuleEnabled(item.requiredModule);
+    }
+
+    return true;
+  });
 
   const groupedItems = filteredNavigationItems.reduce((acc, item) => {
     if (!acc[item.group]) {
