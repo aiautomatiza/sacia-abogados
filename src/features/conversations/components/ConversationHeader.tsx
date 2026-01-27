@@ -10,7 +10,7 @@
  * - Sin cambios en acciones principales (archivar, asignar, etc.)
  */
 
-import { Archive, UserPlus, MoreVertical, Phone, Video, Info } from "lucide-react";
+import { Archive, UserPlus, MoreVertical, Video, Info } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,18 +83,6 @@ export function ConversationHeader({ conversation, onArchive, onAssign, onToggle
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Call Button (solo para WhatsApp/Webchat) */}
-          {(conversation.channel === "whatsapp" || conversation.channel === "webchat") && contact?.numero && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => window.open(`tel:${contact.numero}`, "_blank")}
-              title="Llamar"
-            >
-              <Phone className="h-4 w-4" />
-            </Button>
-          )}
-
           {/* Video Call Button (solo para Webchat) */}
           {conversation.channel === "webchat" && (
             <Button variant="ghost" size="icon" title="Videollamada">

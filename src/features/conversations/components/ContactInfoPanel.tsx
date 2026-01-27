@@ -10,8 +10,7 @@
  * - Sin cambios en estructura general
  */
 
-import { useState } from "react";
-import { X, Mail, Phone, Calendar, MapPin, User, Tag } from "lucide-react";
+import { X, Phone, Calendar, MapPin, User, Tag } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { ContactFieldGroup } from "./contact-info/ContactFieldGroup";
 import { EditableContactField } from "./contact-info/EditableContactField";
 import { TenantCommentsDisplay } from "./contact-info/ClinicCommentsDisplay";
+import { TagSelector } from "./contact-info/TagSelector";
+import { useCustomFields } from "@/features/contacts/hooks/useCustomFields";
 import type { ConversationWithContact } from "../types";
 
 interface Props {
@@ -32,8 +33,7 @@ interface Props {
 
 export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpdateTags }: Props) {
   const { contact } = conversation;
-  const [isEditingTags, setIsEditingTags] = useState(false);
-  const [tagsInput, setTagsInput] = useState(conversation.tags?.join(", ") || "");
+  const { data: customFields = [] } = useCustomFields();
 
   const handleUpdateField = async (field: string, value: any) => {
     if (!onUpdateContact) return;
@@ -45,17 +45,11 @@ export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpd
     }
   };
 
-  const handleSaveTags = async () => {
+  const handleTagsChange = async (tags: string[]) => {
     if (!onUpdateTags) return;
 
     try {
-      const newTags = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
-
-      await onUpdateTags(conversation.id, newTags);
-      setIsEditingTags(false);
+      await onUpdateTags(conversation.id, tags);
     } catch (error) {
       console.error("Error updating tags:", error);
     }
@@ -63,6 +57,11 @@ export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpd
 
   // Extract email from attributes if exists
   const email = contact.attributes?.email || null;
+
+  // Sort custom fields by display_order for consistent rendering
+  const sortedCustomFields = [...customFields].sort(
+    (a, b) => a.display_order - b.display_order
+  );
 
   return (
     <div className="w-80 border-l bg-background flex flex-col h-full">
@@ -121,67 +120,46 @@ export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpd
 
           {/* Tags */}
           <ContactFieldGroup title="Etiquetas" icon={<Tag className="h-4 w-4" />}>
-            {!isEditingTags ? (
-              <div className="space-y-2">
-                {conversation.tags && conversation.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {conversation.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Sin etiquetas</p>
-                )}
-                {onUpdateTags && (
-                  <Button variant="outline" size="sm" onClick={() => setIsEditingTags(true)} className="w-full">
-                    Editar etiquetas
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  placeholder="Etiquetas separadas por comas"
-                  className="w-full px-3 py-2 text-sm border rounded-md"
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleSaveTags} className="flex-1">
-                    Guardar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditingTags(false);
-                      setTagsInput(conversation.tags?.join(", ") || "");
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            )}
+            <TagSelector
+              selectedTags={conversation.tags || []}
+              onTagsChange={handleTagsChange}
+              disabled={!onUpdateTags}
+            />
           </ContactFieldGroup>
 
           <Separator />
 
-          {/* Additional Attributes */}
-          {contact.attributes && Object.keys(contact.attributes).length > 0 && (
+          {/* Custom Fields - Show all defined fields with proper labels */}
+          {sortedCustomFields.length > 0 && (
             <>
               <ContactFieldGroup title="Información adicional" icon={<MapPin className="h-4 w-4" />}>
                 <div className="space-y-2">
-                  {Object.entries(contact.attributes).map(([key, value]) => {
+                  {sortedCustomFields.map((field) => {
                     // Skip email as it's shown above
-                    if (key === "email") return null;
+                    if (field.field_name === "email") return null;
+
+                    const value = contact.attributes?.[field.field_name];
+
+                    // Format value based on field type
+                    let displayValue: string;
+                    if (value === undefined || value === null || value === "") {
+                      displayValue = "-";
+                    } else if (field.field_type === "checkbox") {
+                      displayValue = value ? "Sí" : "No";
+                    } else if (field.field_type === "date" && value) {
+                      try {
+                        displayValue = format(new Date(value), "dd MMM yyyy", { locale: es });
+                      } catch {
+                        displayValue = String(value);
+                      }
+                    } else {
+                      displayValue = String(value);
+                    }
 
                     return (
-                      <div key={key} className="text-sm">
-                        <span className="font-medium text-muted-foreground">{key}:</span> <span>{String(value)}</span>
+                      <div key={field.id} className="text-sm">
+                        <span className="font-medium text-muted-foreground">{field.field_label}:</span>{" "}
+                        <span>{displayValue}</span>
                       </div>
                     );
                   })}

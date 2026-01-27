@@ -113,11 +113,11 @@ export function CreateConversationModal({
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Nueva conversación</DialogTitle>
-          <DialogDescription>Selecciona un contacto y un canal para iniciar una nueva conversación</DialogDescription>
+          <DialogDescription>Selecciona un contacto para iniciar una nueva conversación por WhatsApp</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Canal */}
+          {/* Canal - Solo WhatsApp disponible */}
           <div className="space-y-2">
             <Label htmlFor="channel">Canal de comunicación</Label>
             <Select value={selectedChannel} onValueChange={(value: ConversationChannel) => setSelectedChannel(value)}>
@@ -126,9 +126,6 @@ export function CreateConversationModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="instagram">Instagram</SelectItem>
-                <SelectItem value="webchat">Webchat</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
               </SelectContent>
             </Select>
           </div>
