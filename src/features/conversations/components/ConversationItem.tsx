@@ -2,6 +2,7 @@
  * @fileoverview ConversationItem - Componente memoizado para items de lista
  * @description Componente optimizado con React.memo y custom comparison
  * @performance Solo re-renderiza cuando cambian datos relevantes del item
+ * @optimization TIER S: Comparación de arrays O(n) en lugar de JSON.stringify
  */
 
 import { memo } from 'react';
@@ -13,6 +14,20 @@ import { WhatsAppNumberBadge } from './WhatsAppNumberBadge';
 import { usePrefetchConversation } from '../hooks/usePrefetchConversation';
 import { getInitials, formatLastMessageTime } from '../utils/formatting';
 import type { ConversationWithContact } from '../types';
+
+/**
+ * TIER S: Comparación de arrays optimizada O(n)
+ * Evita JSON.stringify que es más lento y crea strings temporales
+ */
+function arraysEqual(a: string[] | null | undefined, b: string[] | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return a === b;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
 interface ConversationItemProps {
   conversation: ConversationWithContact;
@@ -133,7 +148,7 @@ export const ConversationItem = memo(
       </button>
     );
   },
-  // Custom comparison function - solo re-renderiza si cambian estos valores
+  // TIER S: Custom comparison function optimizada - sin JSON.stringify
   (prevProps, nextProps) => {
     return (
       prevProps.conversation.id === nextProps.conversation.id &&
@@ -144,7 +159,7 @@ export const ConversationItem = memo(
       prevProps.conversation.last_message_preview === nextProps.conversation.last_message_preview &&
       prevProps.conversation.state === nextProps.conversation.state &&
       prevProps.conversation.assigned_to === nextProps.conversation.assigned_to &&
-      JSON.stringify(prevProps.conversation.tags) === JSON.stringify(nextProps.conversation.tags)
+      arraysEqual(prevProps.conversation.tags, nextProps.conversation.tags)
     );
   }
 );

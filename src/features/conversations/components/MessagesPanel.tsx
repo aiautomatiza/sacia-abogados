@@ -1,11 +1,7 @@
 /**
- * @fileoverview Messages Panel Component - ADAPTADO PARA TENANT-BASED
+ * @fileoverview Messages Panel Component - TIER S OPTIMIZADO
  * @description Panel displaying conversation messages with auto-scroll and date separators
- *
- * CAMBIOS vs original:
- * - ❌ Eliminado: Filtros por clinic_id en queries
- * - ✅ Adaptado: usa userId simple para determinar mensajes propios
- * - Sin cambios en lógica de visualización
+ * @performance Memoización optimizada basada en IDs de mensajes
  */
 
 import { useEffect, useRef, useMemo } from "react";
@@ -15,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageBubble } from "./MessageBubble";
 import { DateBadge } from "./DateBadge";
+import { MessagesSkeleton } from "./MessagesSkeleton";
 import type { MessageWithSender } from "../types";
 
 interface Props {
@@ -29,16 +26,28 @@ export function MessagesPanel({ messages, currentUserId, isLoading = false, onLo
   const parentRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
 
-  // Group messages by date for separators
+  // TIER S: Clave estable basada en IDs para evitar recálculos innecesarios
+  // Solo recalcula cuando cambian los IDs de los mensajes, no cuando cambia la referencia del array
+  const messagesKey = useMemo(
+    () => messages.map((m) => m.id).join(","),
+    [messages]
+  );
+
+  // Group messages by date for separators + calculate consecutive grouping
   const messagesWithDates = useMemo(() => {
     const result: Array<{
       type: "message" | "date";
       data: MessageWithSender | string;
+      /** Si es consecutivo del mismo remitente (para reducir espaciado) */
+      isConsecutive?: boolean;
+      /** Si es el último de un grupo consecutivo */
+      isLastInGroup?: boolean;
     }> = [];
 
     let currentDate: Date | null = null;
+    let lastSenderType: string | null = null;
 
-    messages.forEach((message) => {
+    messages.forEach((message, index) => {
       const messageDate = new Date(message.created_at);
 
       // Add date separator if date changed
@@ -48,16 +57,33 @@ export function MessagesPanel({ messages, currentUserId, isLoading = false, onLo
           data: format(messageDate, "yyyy-MM-dd"),
         });
         currentDate = messageDate;
+        lastSenderType = null; // Reset after date separator
       }
+
+      // Calcular si es consecutivo (mismo sender_type que el anterior)
+      const isConsecutive = lastSenderType === message.sender_type;
+
+      // Calcular si es el último del grupo (siguiente mensaje es diferente sender o no hay siguiente)
+      const nextMessage = messages[index + 1];
+      const nextMessageDate = nextMessage ? new Date(nextMessage.created_at) : null;
+      const isLastInGroup =
+        !nextMessage ||
+        nextMessage.sender_type !== message.sender_type ||
+        (nextMessageDate && !isSameDay(messageDate, nextMessageDate));
 
       result.push({
         type: "message",
         data: message,
+        isConsecutive,
+        isLastInGroup,
       });
+
+      lastSenderType = message.sender_type;
     });
 
     return result;
-  }, [messages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messagesKey]); // TIER S: Dependencia en clave estable, no en array completo
 
   // Virtualizer setup
   const virtualizer = useVirtualizer({
@@ -118,7 +144,7 @@ export function MessagesPanel({ messages, currentUserId, isLoading = false, onLo
   return (
     <div
       ref={parentRef}
-      className="flex-1 overflow-auto px-4 py-2"
+      className="flex-1 overflow-auto px-4 py-2 relative"
       style={{ overflowAnchor: 'none' }}
     >
       {/* Load More Indicator */}
@@ -179,6 +205,8 @@ export function MessagesPanel({ messages, currentUserId, isLoading = false, onLo
                     (item.data as MessageWithSender).sender_type === 'contact'
                   }
                   showTimestamp={true}
+                  isConsecutive={item.isConsecutive}
+                  isLastInGroup={item.isLastInGroup}
                 />
               )}
             </div>
@@ -186,10 +214,10 @@ export function MessagesPanel({ messages, currentUserId, isLoading = false, onLo
         })}
       </div>
 
-      {/* Loading Indicator */}
+      {/* TIER S: Skeleton Loading State */}
       {isLoading && messages.length === 0 && (
-        <div className="flex justify-center items-center h-full">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="absolute inset-0">
+          <MessagesSkeleton count={8} />
         </div>
       )}
     </div>

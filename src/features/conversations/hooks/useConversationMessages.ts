@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Hook para obtener mensajes de una conversación
+ * @performance TIER S: Sin .reverse() - ordenamiento ASC desde servidor
+ */
+
 import { useQuery } from "@tanstack/react-query";
 import { listMessages } from "../services/conversation.service";
 import * as conversationsApi from "@/lib/api/endpoints/conversations.api";
@@ -16,21 +21,11 @@ export function useConversationMessages(conversationId: string | null) {
       }
 
       if (USE_API_GATEWAY) {
-        // NEW: API Gateway
-        const result = await conversationsApi.getMessages(conversationId);
-        // Invertir mensajes: la query trae DESC (nuevos primero) pero UI necesita ASC (viejos arriba)
-        return {
-          ...result,
-          messages: [...result.messages].reverse(),
-        };
+        // NEW: API Gateway - TIER S: Sin .reverse(), servidor retorna ASC
+        return await conversationsApi.getMessages(conversationId);
       } else {
-        // OLD: Direct Supabase - SECURITY: Pass scope for tenant validation
-        const result = await listMessages({ conversationId, scope });
-        // Invertir mensajes: la query trae DESC (nuevos primero) pero UI necesita ASC (viejos arriba)
-        return {
-          ...result,
-          messages: [...result.messages].reverse(),
-        };
+        // OLD: Direct Supabase - TIER S: Sin .reverse(), servidor retorna ASC
+        return await listMessages({ conversationId, scope });
       }
     },
     enabled: !!conversationId && !!scope,

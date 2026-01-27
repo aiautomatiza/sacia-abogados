@@ -1,16 +1,38 @@
 /**
- * @fileoverview Conversations Page Component - ADAPTADO PARA TENANT-BASED
+ * @fileoverview Conversations Page Component - TIER S OPTIMIZADO
  * @description Main page orchestrating the entire conversations module
+ * @performance Lazy loading de ContactInfoPanel, debounce en localStorage
  */
 
-import { useState, useEffect } from "react";
-import { Loader2, MessageSquare } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
+import { Loader2, MessageSquare, WifiOff, RefreshCw } from "lucide-react";
 import { ConversationsSidebar } from "./ConversationsSidebar";
 import { ConversationHeader } from "./ConversationHeader";
 import { MessagesPanel } from "./MessagesPanel";
 import { MessageInput } from "./MessageInput";
-import { ContactInfoPanel } from "./ContactInfoPanel";
 import { CreateConversationModal } from "./CreateConversationModal";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// TIER S: Lazy loading de ContactInfoPanel - solo se carga cuando se necesita
+const ContactInfoPanel = lazy(() =>
+  import("./ContactInfoPanel").then((m) => ({ default: m.ContactInfoPanel }))
+);
+
+// TIER S: Skeleton para ContactInfoPanel mientras carga
+function ContactInfoPanelSkeleton() {
+  return (
+    <div className="absolute right-0 top-0 h-full w-80 bg-background border-l p-4 space-y-4 z-40">
+      <Skeleton className="h-20 w-20 rounded-full mx-auto" />
+      <Skeleton className="h-6 w-32 mx-auto" />
+      <Skeleton className="h-4 w-48 mx-auto" />
+      <div className="space-y-3 mt-6">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </div>
+  );
+}
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -67,7 +89,10 @@ interface Props {
 
   useSendMessage: () => UseSendMessageHook;
 
-  useRealtimeConversations: () => { isConnected: boolean };
+  useRealtimeConversations: () => {
+    isConnected: boolean;
+    connectionStatus?: "initializing" | "connecting" | "connected" | "disconnected" | "error";
+  };
 
   initialFilters?: ConversationFilters;
   onFiltersChange?: (filters: ConversationFilters) => void;
@@ -134,7 +159,8 @@ export function ConversationsPage({
 
   const { sendMessage, isLoading: isSendingMessage } = useSendMessage();
 
-  useRealtimeConversations();
+  // TIER S: Capturamos connectionStatus para mostrar indicador visual
+  const { isConnected, connectionStatus } = useRealtimeConversations();
 
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId);
 
@@ -179,14 +205,28 @@ export function ConversationsPage({
     }
   };
 
-  const handleLayoutChange = (sizes: number[]) => {
-    setPanelLayout(sizes);
-    try {
-      localStorage.setItem(PANEL_LAYOUT_KEY, JSON.stringify(sizes));
-    } catch (e) {
-      console.error("Error saving panel layout:", e);
-    }
-  };
+  // TIER S: Debounced save to localStorage para evitar writes excesivos durante resize
+  const debouncedSaveLayout = useMemo(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    return (sizes: number[]) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        try {
+          localStorage.setItem(PANEL_LAYOUT_KEY, JSON.stringify(sizes));
+        } catch (e) {
+          console.error("Error saving panel layout:", e);
+        }
+      }, 500); // Debounce de 500ms
+    };
+  }, []);
+
+  const handleLayoutChange = useCallback(
+    (sizes: number[]) => {
+      setPanelLayout(sizes);
+      debouncedSaveLayout(sizes);
+    },
+    [debouncedSaveLayout]
+  );
 
   return (
     <div className="relative flex h-full bg-background overflow-hidden">
@@ -257,10 +297,18 @@ export function ConversationsPage({
                     Selecciona una conversación del panel lateral para ver los mensajes aquí
                   </p>
 
-                  {/* Realtime indicator */}
+                  {/* TIER S: Realtime indicator con estado real */}
                   <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    Actualizaciones en tiempo real activas
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isConnected
+                          ? "bg-green-500 animate-pulse"
+                          : "bg-yellow-500"
+                      }`}
+                    />
+                    {isConnected
+                      ? "Actualizaciones en tiempo real activas"
+                      : "Conectando..."}
                   </div>
                 </div>
               </div>
@@ -277,14 +325,48 @@ export function ConversationsPage({
         onOpenChange={setIsCreateModalOpen}
       />
 
-      {/* Right Panel: Contact Info */}
+      {/* Right Panel: Contact Info - TIER S: Lazy loaded */}
       {selectedConversation && showInfoPanel && (
-        <ContactInfoPanel
-          conversation={selectedConversation}
-          onClose={() => setShowInfoPanel(false)}
-          onUpdateContact={onUpdateContact}
-          onUpdateTags={onUpdateTags}
-        />
+        <Suspense fallback={<ContactInfoPanelSkeleton />}>
+          <ContactInfoPanel
+            conversation={selectedConversation}
+            onClose={() => setShowInfoPanel(false)}
+            onUpdateContact={onUpdateContact}
+            onUpdateTags={onUpdateTags}
+          />
+        </Suspense>
+      )}
+
+      {/* TIER S: Connection Status Indicator */}
+      {connectionStatus && connectionStatus !== "connected" && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
+              connectionStatus === "error"
+                ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                : connectionStatus === "disconnected"
+                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+            }`}
+          >
+            {connectionStatus === "error" ? (
+              <>
+                <WifiOff className="h-4 w-4" />
+                Error de conexión
+              </>
+            ) : connectionStatus === "disconnected" ? (
+              <>
+                <WifiOff className="h-4 w-4" />
+                Desconectado
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                {connectionStatus === "connecting" ? "Conectando..." : "Inicializando..."}
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Loading Overlay */}

@@ -1,6 +1,7 @@
 /**
- * @fileoverview Conversations Sidebar Component - ADAPTADO PARA TENANT-BASED
+ * @fileoverview Conversations Sidebar Component - TIER S OPTIMIZADO
  * @description Left sidebar with conversation list, search, filters, and infinite scroll
+ * @performance Virtual scroll optimizado con overscan aumentado y scrollPaddingEnd
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -59,21 +60,25 @@ export function ConversationsSidebar({
   // Debounce timer for search
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Virtualizer setup
+  // TIER S: Virtualizer optimizado
   const virtualizer = useVirtualizer({
     count: conversations.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 88, // Altura estimada por item en pixels
-    overscan: 5, // Pre-renderizar 5 items arriba/abajo
+    overscan: 10, // TIER S: Aumentado de 5 a 10 para scroll más suave
+    scrollPaddingEnd: 100, // TIER S: Buffer para trigger de infinite scroll más temprano
   });
 
-  // Infinite scroll with virtualizer
+  // TIER S: Infinite scroll optimizado - carga antes de llegar al final
   useEffect(() => {
-    const [lastItem] = virtualizer.getVirtualItems().slice(-1);
+    const virtualItems = virtualizer.getVirtualItems();
+    const [lastItem] = virtualItems.slice(-1);
     if (!lastItem) return;
 
+    // TIER S: Cargar más cuando estamos a 5 items del final (no esperar al último)
+    const threshold = Math.min(5, Math.floor(conversations.length * 0.1)); // 10% o 5 items, lo que sea menor
     if (
-      lastItem.index >= conversations.length - 1 &&
+      lastItem.index >= conversations.length - 1 - threshold &&
       hasNextPage &&
       !isFetchingNextPage
     ) {

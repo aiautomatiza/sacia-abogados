@@ -4,6 +4,7 @@ export { useSendMessage } from './useSendMessage';
 export { useConversationActions } from './useConversationActions';
 export { useConversationsFilters } from './useConversationsFilters';
 export { useRealtimeConversations } from './useRealtimeConversations';
+export { useRealtimeMessages } from './useRealtimeMessages';
 export { useTags } from './useTags';
 export { useWhatsAppWindow } from './useWhatsAppWindow';
 export { useFileUpload } from './useFileUpload';

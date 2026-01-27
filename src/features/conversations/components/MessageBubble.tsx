@@ -23,16 +23,32 @@ interface Props {
   isOwnMessage: boolean;
   showSender?: boolean;
   showTimestamp?: boolean;
+  /** Si es true, es un mensaje consecutivo del mismo remitente - reduce espaciado */
+  isConsecutive?: boolean;
+  /** Si es true, es el último mensaje de un grupo consecutivo */
+  isLastInGroup?: boolean;
 }
 
-export const MessageBubble = memo(function MessageBubble({ message, isOwnMessage, showSender = true, showTimestamp = true }: Props) {
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  isOwnMessage,
+  showSender = true,
+  showTimestamp = true,
+  isConsecutive = false,
+  isLastInGroup = true,
+}: Props) {
   const hasAttachment = message.file_url && message.content_type !== "text";
 
+  // WhatsApp-style spacing:
+  // - Si NO es el último del grupo (hay más mensajes del mismo remitente después) → margen mínimo
+  // - Si ES el último del grupo (el siguiente es de otro remitente) → margen normal
+  const marginClass = isLastInGroup ? "mb-3" : "mb-0.5";
+
   return (
-    <div className={cn("flex items-start gap-2 mb-3", isOwnMessage ? "flex-row-reverse" : "flex-row")}>
-      {/* Avatar - Solo para mensajes del contacto */}
+    <div className={cn("flex items-start gap-2", marginClass, isOwnMessage ? "flex-row-reverse" : "flex-row")}>
+      {/* Avatar - Solo para mensajes del contacto y solo si NO es consecutivo */}
       {!isOwnMessage && (
-        <Avatar className="h-8 w-8">
+        <Avatar className={cn("h-8 w-8", isConsecutive && "invisible")}>
           <AvatarFallback className="text-xs bg-primary/10">
             {message.sender_type === "contact" ? "C" : "S"}
           </AvatarFallback>
@@ -40,8 +56,8 @@ export const MessageBubble = memo(function MessageBubble({ message, isOwnMessage
       )}
 
       <div className={cn("flex flex-col max-w-[70%]", isOwnMessage ? "items-end" : "items-start")}>
-        {/* Sender Name */}
-        {showSender && message.sender && !isOwnMessage && (
+        {/* Sender Name - oculto para mensajes consecutivos */}
+        {showSender && message.sender && !isOwnMessage && !isConsecutive && (
           <span className="text-xs text-muted-foreground mb-1 px-1">{message.sender.full_name}</span>
         )}
 
@@ -112,6 +128,8 @@ export const MessageBubble = memo(function MessageBubble({ message, isOwnMessage
     prevProps.message.delivery_status === nextProps.message.delivery_status &&
     prevProps.isOwnMessage === nextProps.isOwnMessage &&
     prevProps.showSender === nextProps.showSender &&
-    prevProps.showTimestamp === nextProps.showTimestamp
+    prevProps.showTimestamp === nextProps.showTimestamp &&
+    prevProps.isConsecutive === nextProps.isConsecutive &&
+    prevProps.isLastInGroup === nextProps.isLastInGroup
   );
 });

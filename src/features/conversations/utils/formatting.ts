@@ -4,7 +4,7 @@
  * @refactor Elimina duplicación de código entre componentes
  */
 
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 /**
@@ -21,22 +21,20 @@ export function getInitials(name: string): string {
 }
 
 /**
- * Formatea timestamp de último mensaje
- * @returns HH:mm si < 24h, día de la semana si < 7d, dd/MM si más antiguo
+ * Formatea timestamp de último mensaje (estilo WhatsApp)
+ * @returns HH:mm si es hoy, "Ayer" si es ayer, dd/MM/yyyy para fechas anteriores
  */
 export function formatLastMessageTime(timestamp: string | null): string {
   if (!timestamp) return '';
 
   const date = new Date(timestamp);
-  const now = new Date();
-  const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-  if (diffInHours < 24) {
+  if (isToday(date)) {
     return format(date, 'HH:mm', { locale: es });
-  } else if (diffInHours < 7 * 24) {
-    return format(date, 'EEE', { locale: es });
+  } else if (isYesterday(date)) {
+    return 'Ayer';
   } else {
-    return format(date, 'dd/MM', { locale: es });
+    return format(date, 'dd/MM/yyyy', { locale: es });
   }
 }
 

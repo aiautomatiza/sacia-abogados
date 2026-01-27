@@ -25,6 +25,16 @@ import type {
 // CONVERSATIONS
 // ============================================================================
 
+/**
+ * Lista conversaciones con filtros y paginación
+ *
+ * TIER S NOTA: La búsqueda usa dos queries (contactos + conversaciones) porque
+ * PostgREST no soporta filtrar en relaciones embebidas directamente.
+ * Para optimización futura, considerar:
+ * - Crear función RPC en Postgres para búsqueda optimizada
+ * - Agregar full-text search index en crm_contacts
+ * - Usar vista materializada para búsqueda frecuente
+ */
 export const listConversations = async ({
   scope,
   filters = {},
@@ -40,6 +50,7 @@ export const listConversations = async ({
   const hasSearch = filters.search && filters.search.trim().length > 0;
 
   // Si hay búsqueda, primero obtenemos los IDs de contactos que coinciden
+  // TIER S: Limitamos la búsqueda a 200 contactos para evitar queries pesadas
   let matchingContactIds: string[] | null = null;
 
   if (hasSearch) {
@@ -49,15 +60,16 @@ export const listConversations = async ({
       .from("crm_contacts")
       .select("id")
       .eq("tenant_id", scope.tenantId)
-      .or(`nombre.ilike.${searchTerm},numero.ilike.${searchTerm}`);
-    
+      .or(`nombre.ilike.${searchTerm},numero.ilike.${searchTerm}`)
+      .limit(200); // TIER S: Límite para evitar queries pesadas
+
     if (contactError) {
       console.error("Error searching contacts:", contactError);
       throw contactError;
     }
-    
+
     matchingContactIds = matchingContacts?.map(c => c.id) || [];
-    
+
     // Si no hay contactos que coincidan, retornar vacío
     if (matchingContactIds.length === 0) {
       return {
@@ -101,7 +113,7 @@ export const listConversations = async ({
         alias
       )
     `,
-      { count: "exact" }
+      { count: "estimated" } // TIER S: Más rápido que "exact", evita full table scan
     )
     .eq("tenant_id", scope.tenantId);
 
@@ -487,7 +499,7 @@ export const listMessages = async ({
       { count: "exact" }
     )
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: true }) // TIER S: ASC para evitar .reverse() en cliente
     .range(offset, offset + pageSize - 1);
 
   if (error) {

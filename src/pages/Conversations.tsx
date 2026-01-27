@@ -5,6 +5,7 @@ import {
   useConversationMessages,
   useSendMessage,
   useRealtimeConversations,
+  useRealtimeMessages,
   useConversationsFilters,
   useFileUpload,
   useConversationActions,
@@ -44,6 +45,14 @@ export default function Conversations() {
   const { filters: storedFilters, setFilters: setStoredFilters } = useConversationsFilters();
   const { uploadFile } = useFileUpload();
   const { archiveConversation } = useConversationActions();
+
+  // TIER S: Suscripción realtime granular por conversación seleccionada
+  // Se suscribe solo a los mensajes de la conversación activa para actualizaciones instantáneas
+  useRealtimeMessages({
+    conversationId: urlConversationId,
+    debounceMs: 100, // 100ms para UX instantánea
+    enabled: !!urlConversationId,
+  });
 
   // Convert stored filters to local filters format
   const filters: LocalConversationFilters = {

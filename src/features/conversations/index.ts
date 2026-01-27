@@ -13,6 +13,7 @@ export {
   useConversationActions,
   useConversationsFilters,
   useRealtimeConversations,
+  useRealtimeMessages,
   useTags,
   useWhatsAppWindow,
   useFileUpload,

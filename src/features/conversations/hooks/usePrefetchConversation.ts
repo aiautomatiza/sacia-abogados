@@ -1,7 +1,7 @@
 /**
  * @fileoverview Prefetching Hook for Conversations
  * @description Prefetch conversation details and messages on hover
- * @performance Cache hit rate objetivo > 80%
+ * @performance TIER S: Cache hit rate objetivo > 80%, sin .reverse()
  */
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,21 +23,11 @@ export function usePrefetchConversation() {
       queryKey: ['conversation-messages', conversationId],
       queryFn: async () => {
         if (USE_API_GATEWAY) {
-          // NEW: API Gateway
-          const result = await conversationsApi.getMessages(conversationId);
-          // Invertir mensajes como lo hace el hook principal
-          return {
-            ...result,
-            messages: [...result.messages].reverse(),
-          };
+          // NEW: API Gateway - TIER S: Sin .reverse(), servidor retorna ASC
+          return await conversationsApi.getMessages(conversationId);
         } else {
-          // OLD: Direct Supabase
-          const result = await listMessages({ conversationId });
-          // Invertir mensajes como lo hace el hook principal
-          return {
-            ...result,
-            messages: [...result.messages].reverse(),
-          };
+          // OLD: Direct Supabase - TIER S: Sin .reverse(), servidor retorna ASC
+          return await listMessages({ conversationId });
         }
       },
       staleTime: 10 * 1000, // 10s - mismo que el hook principal

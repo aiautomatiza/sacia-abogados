@@ -47,9 +47,10 @@ export function useSendMessage() {
           updated_at: new Date().toISOString(),
         };
 
+        // TIER S: Mensajes ahora vienen en orden ASC, agregar al final
         return {
           ...old,
-          messages: [optimisticMessage, ...(old.messages || [])],
+          messages: [...(old.messages || []), optimisticMessage],
           total: (old.total || 0) + 1,
         };
       });
