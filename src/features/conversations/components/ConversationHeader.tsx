@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { ChannelBadge } from "./ChannelBadge";
+import { ContactStatusBadge } from "./ContactStatusBadge";
 import type { ConversationWithContact } from "../types";
 
 interface Props {
@@ -62,6 +63,9 @@ export function ConversationHeader({ conversation, onArchive, onAssign, onToggle
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-sm truncate">{contact?.nombre || "Sin nombre"}</h3>
               <ChannelBadge channel={conversation.channel} />
+              {contact?.status && (
+                <ContactStatusBadge status={contact.status} size="default" />
+              )}
               {conversation.status === "archived" && (
                 <Badge variant="secondary" className="text-xs">
                   Archivada

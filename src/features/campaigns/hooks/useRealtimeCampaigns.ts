@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProfile } from '@/hooks/use-profile';
+import { useProfile } from '@/hooks/useProfile';
 import { useRealtime, type RealtimeSubscription, type RealtimePayload } from '@/hooks/use-realtime';
 import type { Campaign } from '../types';
 

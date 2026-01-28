@@ -104,7 +104,14 @@ export const listConversations = async ({
       contact:crm_contacts!conversations_contact_id_fkey (
         id,
         nombre,
-        numero
+        numero,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,
@@ -223,7 +230,14 @@ export const getConversationByContactId = async (
         id,
         nombre,
         numero,
-        attributes
+        attributes,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,
@@ -263,7 +277,14 @@ export const getConversationById = async (
         id,
         nombre,
         numero,
-        attributes
+        attributes,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,
@@ -414,7 +435,14 @@ export const createConversation = async (
         id,
         nombre,
         numero,
-        attributes
+        attributes,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,
@@ -448,7 +476,14 @@ export const createConversation = async (
         id,
         nombre,
         numero,
-        attributes
+        attributes,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,

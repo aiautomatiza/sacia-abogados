@@ -43,3 +43,4 @@ export { FilePreview } from './components/FilePreview';
 export { CreateConversationModal } from './components/CreateConversationModal';
 export { ContactSelectorForConversation } from './components/ContactSelectorForConversation';
 export { AdvancedConversationFilters } from './components/AdvancedConversationFilters';
+export { ContactStatusBadge } from './components/ContactStatusBadge';

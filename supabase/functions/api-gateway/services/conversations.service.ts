@@ -30,6 +30,16 @@ export type MessageContentType = 'text' | 'image' | 'audio' | 'video' | 'file' |
 export type MessageSenderType = 'customer' | 'agent' | 'system' | 'bot';
 
 /**
+ * Contact status from CRM
+ */
+export interface ContactStatus {
+  id: string;
+  name: string;
+  color: string;
+  icon: string | null;
+}
+
+/**
  * Contact from CRM
  */
 export interface Contact {
@@ -37,6 +47,8 @@ export interface Contact {
   nombre: string | null;
   numero: string;
   attributes: Record<string, any> | null;
+  status_id: string | null;
+  status: ContactStatus | null;
 }
 
 /**
@@ -228,7 +240,14 @@ export async function listConversations(
       contact:crm_contacts!conversations_contact_id_fkey (
         id,
         nombre,
-        numero
+        numero,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,
@@ -361,7 +380,14 @@ export async function getConversationById(
         id,
         nombre,
         numero,
-        attributes
+        attributes,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,
@@ -416,7 +442,14 @@ export async function getConversationByContactId(
         id,
         nombre,
         numero,
-        attributes
+        attributes,
+        status_id,
+        status:crm_contact_statuses!crm_contacts_status_id_fkey (
+          id,
+          name,
+          color,
+          icon
+        )
       ),
       whatsapp_number:whatsapp_numbers!conversations_whatsapp_number_id_fkey (
         id,

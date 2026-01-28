@@ -70,10 +70,16 @@ export function useContactMutations() {
     mutationFn: async (data: Partial<Contact>) => {
       if (USE_API_GATEWAY) {
         // NEW: API Gateway
+        // Extract core fields and treat remaining properties as custom fields
+        const { numero, nombre, status_id, attributes, ...customFields } = data;
         return contactsApi.createContact({
-          numero: data.numero!,
-          nombre: data.nombre,
-          attributes: data.attributes,
+          numero: numero!,
+          nombre,
+          status_id: status_id ?? undefined,
+          attributes: {
+            ...attributes,
+            ...customFields,
+          },
         });
       } else {
         // OLD: Direct Supabase
@@ -93,10 +99,16 @@ export function useContactMutations() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<Contact> }) => {
       if (USE_API_GATEWAY) {
         // NEW: API Gateway
+        // Extract core fields and treat remaining properties as custom fields
+        const { numero, nombre, status_id, attributes, ...customFields } = data;
         return contactsApi.updateContact(id, {
-          numero: data.numero,
-          nombre: data.nombre,
-          attributes: data.attributes,
+          numero,
+          nombre,
+          status_id,
+          attributes: {
+            ...attributes,
+            ...customFields,
+          },
         });
       } else {
         // OLD: Direct Supabase

@@ -37,7 +37,7 @@ type AppointmentStatus =
 interface CreateAppointmentRequest {
   tenant_id: string;
   type: AppointmentType;
-  contact_id?: string;
+  contact_id?: string; // UUID or phone number - auto-detected
   contact_phone?: string; // Alternative to contact_id - will lookup contact
   scheduled_at: string; // ISO 8601 datetime
   duration_minutes?: number;
@@ -62,8 +62,8 @@ interface UpdateStatusRequest {
 interface LookupRequest {
   tenant_id: string;
   appointment_id?: string;
-  contact_id?: string;
-  contact_phone?: string;
+  contact_id?: string; // UUID or phone number - auto-detected
+  contact_phone?: string; // Alternative to contact_id
   date_from?: string;
   date_to?: string;
   status?: AppointmentStatus[];
@@ -95,6 +95,42 @@ interface AppointmentResult {
 // ============================================================================
 // Utilities
 // ============================================================================
+
+/**
+ * Checks if a string is a valid UUID format
+ */
+function isValidUUID(value: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value);
+}
+
+/**
+ * Resolves a contact identifier that could be either a UUID (contact_id) or phone number
+ * Returns the contact_id if found, or null if not found
+ */
+async function resolveContactIdentifier(
+  supabase: SupabaseClient,
+  tenantId: string,
+  identifier: string
+): Promise<{ id: string; nombre: string | null; numero: string } | null> {
+  // If it looks like a UUID, try to find by ID first
+  if (isValidUUID(identifier)) {
+    const { data, error } = await supabase
+      .from('crm_contacts')
+      .select('id, nombre, numero')
+      .eq('id', identifier)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!error && data) {
+      return data;
+    }
+    // If not found by UUID, it might still be a phone that looks like a UUID (unlikely but possible)
+  }
+
+  // Try to find by phone number
+  return lookupContactByPhone(supabase, tenantId, identifier);
+}
 
 /**
  * Normalizes a Spanish phone number to E.164 format
@@ -257,37 +293,27 @@ async function handleCreate(supabase: SupabaseClient, payload: CreateAppointment
     return errorResponse("Appointments of type 'in_person' require location_id", 400, 'VALIDATION_ERROR');
   }
 
-  // Resolve contact_id
-  let contactId = payload.contact_id;
+  // Resolve contact - accepts either contact_id (UUID) or contact_phone (phone number)
+  // The contact_id field can also contain a phone number for convenience
+  const contactIdentifier = payload.contact_id || payload.contact_phone;
 
-  if (!contactId && payload.contact_phone) {
-    const contact = await lookupContactByPhone(supabase, payload.tenant_id, payload.contact_phone);
-    if (!contact) {
-      return errorResponse(
-        `Contact not found with phone: ${payload.contact_phone}`,
-        404,
-        'CONTACT_NOT_FOUND'
-      );
-    }
-    contactId = contact.id;
-    console.log(`[external-appointments-api/create] Resolved contact by phone: ${contactId}`);
-  }
-
-  if (!contactId) {
+  if (!contactIdentifier) {
     return errorResponse('Either contact_id or contact_phone must be provided', 400, 'VALIDATION_ERROR');
   }
 
-  // Verify contact exists and belongs to tenant
-  const { data: contact, error: contactError } = await supabase
-    .from('crm_contacts')
-    .select('id, tenant_id, numero')
-    .eq('id', contactId)
-    .eq('tenant_id', payload.tenant_id)
-    .maybeSingle();
+  // Use unified resolver that handles both UUID and phone number formats
+  const contact = await resolveContactIdentifier(supabase, payload.tenant_id, contactIdentifier);
 
-  if (contactError || !contact) {
-    return errorResponse('Contact not found or does not belong to tenant', 404, 'CONTACT_NOT_FOUND');
+  if (!contact) {
+    return errorResponse(
+      `Contact not found with identifier: ${contactIdentifier}`,
+      404,
+      'CONTACT_NOT_FOUND'
+    );
   }
+
+  const contactId = contact.id;
+  console.log(`[external-appointments-api/create] Resolved contact: ${contactId} (from: ${contactIdentifier})`)
 
   // Verify agent exists (for call type)
   if (payload.type === 'call' && payload.agent_id) {
@@ -528,13 +554,16 @@ async function handleLookup(supabase: SupabaseClient, payload: LookupRequest): P
     return successResponse({ appointment: data });
   }
 
-  // Resolve contact_id from phone if provided
-  let contactId = payload.contact_id;
+  // Resolve contact - accepts either contact_id (UUID) or contact_phone (phone number)
+  // The contact_id field can also contain a phone number for convenience
+  const contactIdentifier = payload.contact_id || payload.contact_phone;
+  let contactId: string | undefined;
 
-  if (!contactId && payload.contact_phone) {
-    const contact = await lookupContactByPhone(supabase, payload.tenant_id, payload.contact_phone);
+  if (contactIdentifier) {
+    const contact = await resolveContactIdentifier(supabase, payload.tenant_id, contactIdentifier);
     if (contact) {
       contactId = contact.id;
+      console.log(`[external-appointments-api/lookup] Resolved contact: ${contactId} (from: ${contactIdentifier})`);
     }
   }
 

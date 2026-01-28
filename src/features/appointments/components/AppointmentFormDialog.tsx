@@ -4,7 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarIcon, Phone, MapPin } from "lucide-react";
+import { CalendarIcon, Phone, MapPin, Search, User, X } from "lucide-react";
+import { useContacts } from "@/features/contacts/hooks/useContacts";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -123,6 +126,22 @@ export function AppointmentFormDialog({
 
   const isEditing = !!appointment;
 
+  // Contact search state
+  const [contactSearch, setContactSearch] = useState("");
+  const { data: contactsData, isLoading: isLoadingContacts } = useContacts(
+    { search: contactSearch },
+    1,
+    50 // Load up to 50 contacts for selection
+  );
+  const contacts = contactsData?.data || [];
+
+  // Track selected contact info for display
+  const [selectedContact, setSelectedContact] = useState<{
+    id: string;
+    nombre: string;
+    numero: string | null;
+  } | null>(null);
+
   const form = useForm<FormData>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
@@ -157,6 +176,14 @@ export function AppointmentFormDialog({
         call_phone_number: appointment.call_phone_number || "",
       });
       setAppointmentType(appointment.type);
+      // Set selected contact from appointment data
+      if (appointment.contact) {
+        setSelectedContact({
+          id: appointment.contact_id,
+          nombre: appointment.contact.nombre || "Sin nombre",
+          numero: appointment.contact.numero,
+        });
+      }
     } else if (preSelectedContactId) {
       form.reset({
         type: "call",
@@ -172,6 +199,12 @@ export function AppointmentFormDialog({
         call_phone_number: preSelectedContactPhone || "",
       });
       setAppointmentType("call");
+      // Set pre-selected contact
+      setSelectedContact({
+        id: preSelectedContactId,
+        nombre: preSelectedContactName || "Sin nombre",
+        numero: preSelectedContactPhone || null,
+      });
     } else {
       form.reset({
         type: "call",
@@ -187,8 +220,10 @@ export function AppointmentFormDialog({
         call_phone_number: "",
       });
       setAppointmentType("call");
+      setSelectedContact(null);
+      setContactSearch("");
     }
-  }, [appointment, preSelectedContactId, preSelectedContactPhone, form]);
+  }, [appointment, preSelectedContactId, preSelectedContactName, preSelectedContactPhone, form]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -279,49 +314,146 @@ export function AppointmentFormDialog({
               </Tabs>
             </div>
 
-            {/* Contacto (si viene preseleccionado, mostrarlo) */}
-            {preSelectedContactId ? (
-              <div className="space-y-2">
-                <FormLabel>Contacto</FormLabel>
-                <div className="p-3 bg-muted rounded-md">
-                  <p className="font-medium">
-                    {preSelectedContactName || "Sin nombre"}
-                  </p>
-                  {preSelectedContactPhone && (
-                    <p className="text-sm text-muted-foreground">
-                      {preSelectedContactPhone}
-                    </p>
+            {/* Contacto - Selector con búsqueda */}
+            <FormField
+              control={form.control}
+              name="contact_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Contacto <span className="text-destructive">*</span>
+                  </FormLabel>
+
+                  {/* Si hay contacto seleccionado, mostrar chip con opción de cambiar */}
+                  {selectedContact ? (
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                          {selectedContact.nombre
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .substring(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {selectedContact.nombre}
+                        </p>
+                        {selectedContact.numero && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {selectedContact.numero}
+                          </p>
+                        )}
+                      </div>
+                      {!isEditing && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0"
+                          onClick={() => {
+                            setSelectedContact(null);
+                            field.onChange("");
+                            setContactSearch("");
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Buscador */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          placeholder="Buscar por nombre o teléfono..."
+                          value={contactSearch}
+                          onChange={(e) => setContactSearch(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+
+                      {/* Lista de contactos */}
+                      <ScrollArea className="h-48 border rounded-md">
+                        {isLoadingContacts ? (
+                          <div className="flex items-center justify-center h-full p-4">
+                            <p className="text-sm text-muted-foreground">
+                              Cargando contactos...
+                            </p>
+                          </div>
+                        ) : contacts.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-full p-4">
+                            <User className="h-8 w-8 text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground text-center">
+                              {contactSearch
+                                ? "No se encontraron contactos"
+                                : "Escribe para buscar contactos"}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-2">
+                            {contacts.map((contact) => (
+                              <button
+                                key={contact.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedContact({
+                                    id: contact.id,
+                                    nombre: contact.nombre || "Sin nombre",
+                                    numero: contact.numero,
+                                  });
+                                  field.onChange(contact.id);
+                                  // Auto-fill phone number if type is call
+                                  if (
+                                    appointmentType === "call" &&
+                                    contact.numero &&
+                                    !form.getValues("call_phone_number")
+                                  ) {
+                                    form.setValue(
+                                      "call_phone_number",
+                                      contact.numero
+                                    );
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full flex items-center gap-3 p-2 rounded-md hover:bg-accent transition-colors text-left"
+                                )}
+                              >
+                                <Avatar className="h-8 w-8 flex-shrink-0">
+                                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                    {contact.nombre
+                                      ? contact.nombre
+                                          .split(" ")
+                                          .map((n) => n[0])
+                                          .join("")
+                                          .toUpperCase()
+                                          .substring(0, 2)
+                                      : "?"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">
+                                    {contact.nombre || "Sin nombre"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {contact.numero || "Sin teléfono"}
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
                   )}
-                </div>
-                <input
-                  type="hidden"
-                  {...form.register("contact_id")}
-                  value={preSelectedContactId}
-                />
-              </div>
-            ) : (
-              <FormField
-                control={form.control}
-                name="contact_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      ID de Contacto <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Ingresa el ID del contacto"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Ingresa el ID del contacto para la cita
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Fecha y hora */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

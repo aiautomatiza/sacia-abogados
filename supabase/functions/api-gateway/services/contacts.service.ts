@@ -18,6 +18,9 @@ export interface Contact {
   numero: string;
   nombre: string | null;
   attributes: Record<string, any>;
+  status_id: string | null;
+  status_updated_at: string | null;
+  status_updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +40,7 @@ export interface CreateContactInput {
   numero: string;
   nombre?: string;
   attributes?: Record<string, any>;
+  status_id?: string | null;
   skip_external_sync?: boolean;
 }
 
@@ -398,6 +402,13 @@ export async function updateContact(
     updateData.attributes = updates.attributes;
   }
 
+  // Handle status_id update with tracking fields
+  if (updates.status_id !== undefined) {
+    updateData.status_id = updates.status_id;
+    updateData.status_updated_at = new Date().toISOString();
+    updateData.status_updated_by = userScope.userId;
+  }
+
   // Build update query with tenant filter
   let query = supabaseClient
     .from('crm_contacts')
@@ -506,4 +517,76 @@ export async function deleteContactsBulk(
     console.error('[contacts] Error bulk deleting contacts:', error);
     throw new ApiError(error.message, 500, 'DATABASE_ERROR');
   }
+}
+
+/**
+ * Updates a contact's status
+ * - Validates tenant ownership
+ * - Updates status_id, status_updated_at, status_updated_by
+ * - Triggers status history logging via database trigger
+ *
+ * @param supabaseClient - Supabase client with user context
+ * @param userScope - Current user scope
+ * @param contactId - Contact ID
+ * @param statusId - New status ID (null to remove status)
+ * @returns Success response
+ */
+export async function updateContactStatus(
+  supabaseClient: SupabaseClient,
+  userScope: UserScope,
+  contactId: string,
+  statusId: string | null
+): Promise<{ success: boolean }> {
+  console.log('[contacts] Updating contact status:', { contactId, statusId });
+
+  // Validate that status exists (if not null)
+  if (statusId !== null) {
+    const { data: statusData, error: statusError } = await supabaseClient
+      .from('crm_contact_statuses')
+      .select('id')
+      .eq('id', statusId)
+      .eq('tenant_id', userScope.tenantId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (statusError) {
+      console.error('[contacts] Error validating status:', statusError);
+      throw new ApiError('Error validating status', 500, 'DATABASE_ERROR');
+    }
+
+    if (!statusData) {
+      throw new ApiError('Status not found or inactive', 404, 'STATUS_NOT_FOUND');
+    }
+  }
+
+  // Update contact with new status
+  let query = supabaseClient
+    .from('crm_contacts')
+    .update({
+      status_id: statusId,
+      status_updated_at: new Date().toISOString(),
+      status_updated_by: userScope.userId,
+    })
+    .eq('id', contactId);
+
+  // Non-super-admins must match tenant
+  if (!userScope.isSuperAdmin) {
+    query = query.eq('tenant_id', userScope.tenantId);
+  }
+
+  const { data, error } = await query.select('id').single();
+
+  if (error) {
+    console.error('[contacts] Error updating contact status:', error);
+
+    if (error.code === 'PGRST116') {
+      throw new ApiError('Contact not found or access denied', 404, 'NOT_FOUND');
+    }
+
+    throw new ApiError(error.message, 500, 'DATABASE_ERROR');
+  }
+
+  console.log('[contacts] Contact status updated successfully:', contactId);
+
+  return { success: true };
 }

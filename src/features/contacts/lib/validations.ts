@@ -5,6 +5,7 @@ export function buildContactSchema(customFields: CustomField[]) {
   const schemaShape: Record<string, z.ZodTypeAny> = {
     numero: z.string().min(1, 'El número es obligatorio'),
     nombre: z.string().optional(),
+    status_id: z.string().uuid().nullable().optional(),
   };
 
   customFields.forEach(field => {

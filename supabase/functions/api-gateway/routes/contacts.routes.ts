@@ -13,6 +13,7 @@ import {
   updateContactSchema,
   bulkDeleteSchema,
   uuidParamSchema,
+  updateContactStatusSchema,
 } from '../utils/validation.ts';
 
 export const contactsRoutes = new Hono();
@@ -230,5 +231,53 @@ contactsRoutes.post(
       success: true,
       deletedCount: ids.length,
     });
+  }
+);
+
+/**
+ * PATCH /api/contacts/:id/status
+ * Update a contact's status
+ *
+ * Request body:
+ * {
+ *   status_id: string | null (UUID of status, or null to remove)
+ * }
+ *
+ * Response:
+ * {
+ *   success: true
+ * }
+ *
+ * Notes:
+ * - Validates status belongs to tenant and is active
+ * - Automatically logs change to status history via database trigger
+ * - Updates status_updated_at and status_updated_by automatically
+ */
+contactsRoutes.patch(
+  '/:id/status',
+  zValidator('json', updateContactStatusSchema),
+  async (c) => {
+    const userScope = c.get('userScope') as UserScope;
+    const supabaseClient = c.get('supabaseClient') as SupabaseClient;
+    const id = c.req.param('id');
+    const { status_id } = c.req.valid('json');
+
+    // Validate UUID format
+    const validationResult = uuidParamSchema.safeParse(id);
+    if (!validationResult.success) {
+      return c.json(
+        { error: 'Invalid ID format', details: validationResult.error.issues },
+        400
+      );
+    }
+
+    const result = await contactsService.updateContactStatus(
+      supabaseClient,
+      userScope,
+      id,
+      status_id
+    );
+
+    return c.json(result);
   }
 );

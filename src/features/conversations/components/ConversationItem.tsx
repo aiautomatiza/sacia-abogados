@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ChannelBadge } from './ChannelBadge';
 import { WhatsAppNumberBadge } from './WhatsAppNumberBadge';
+import { ContactStatusBadge } from './ContactStatusBadge';
 import { usePrefetchConversation } from '../hooks/usePrefetchConversation';
 import { getInitials, formatLastMessageTime } from '../utils/formatting';
 import type { ConversationWithContact } from '../types';
@@ -112,6 +113,10 @@ export const ConversationItem = memo(
             <div className="flex items-center gap-1.5 flex-wrap">
               <ChannelBadge channel={conversation.channel} size="sm" />
 
+              {conversation.contact?.status && (
+                <ContactStatusBadge status={conversation.contact.status} size="sm" />
+              )}
+
               {conversation.channel === 'whatsapp' && conversation.whatsapp_number && (
                 <WhatsAppNumberBadge
                   whatsappNumber={conversation.whatsapp_number}
@@ -183,6 +188,7 @@ export const ConversationItem = memo(
       prevProps.conversation.last_message_preview === nextProps.conversation.last_message_preview &&
       prevProps.conversation.state === nextProps.conversation.state &&
       prevProps.conversation.assigned_to === nextProps.conversation.assigned_to &&
+      prevProps.conversation.contact?.status_id === nextProps.conversation.contact?.status_id &&
       arraysEqual(prevProps.conversation.tags, nextProps.conversation.tags)
     );
   }

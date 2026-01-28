@@ -165,11 +165,22 @@ export default function Conversations() {
       onConversationSelect={handleConversationSelect}
       onUploadFile={handleUploadFile}
       onUpdateContact={async (id, updates) => {
-        await updateContact(id, updates);
+        if (!scope) throw new Error("No scope available");
+        await updateContact(id, updates, scope);
+        queryClient.invalidateQueries({ queryKey: ["contacts"] });
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
       }}
-      onUpdateTags={updateConversationTags}
+      onUpdateTags={async (conversationId, tags) => {
+        if (!scope) throw new Error("No scope available");
+        await updateConversationTags(conversationId, tags, scope);
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      }}
       onArchiveConversation={async (id) => { archiveConversation(id); }}
-      onAssignConversation={assignConversation}
+      onAssignConversation={async (conversationId, userId) => {
+        if (!scope) throw new Error("No scope available");
+        await assignConversation(conversationId, userId, scope);
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      }}
       onCreateConversation={async (input) => {
         if (!tenantId) throw new Error("No tenant ID");
         await createConversation({

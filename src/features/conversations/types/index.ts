@@ -12,12 +12,22 @@ export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 export type ConversationMessage = Database["public"]["Tables"]["conversation_messages"]["Row"];
 export type ConversationTag = Database["public"]["Tables"]["conversation_tags"]["Row"];
 
+// Contact status from CRM
+export interface ContactStatus {
+  id: string;
+  name: string;
+  color: string;
+  icon: string | null;
+}
+
 // Contact from CRM
 export interface Contact {
   id: string;
   nombre: string | null;
   numero: string;
   attributes: Record<string, any> | null;
+  status_id: string | null;
+  status: ContactStatus | null;
 }
 
 // WhatsApp number configuration
