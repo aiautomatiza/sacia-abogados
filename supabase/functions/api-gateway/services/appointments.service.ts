@@ -412,10 +412,8 @@ export async function createAppointment(
   await verifyContactAccess(supabaseClient, userScope, input.contact_id);
 
   // Verify agent/location based on type
-  if (input.type === 'call') {
-    if (!input.agent_id) {
-      throw new ApiError("Appointments of type 'call' require agent_id", 400, 'VALIDATION_ERROR');
-    }
+  // Note: agent_id is optional for 'call' appointments (can be assigned later)
+  if (input.type === 'call' && input.agent_id) {
     await verifyAgentExists(supabaseClient, input.agent_id);
   } else if (input.type === 'in_person') {
     if (!input.location_id) {

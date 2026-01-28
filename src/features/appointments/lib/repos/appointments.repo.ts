@@ -8,6 +8,7 @@ import type {
   UpdateAppointmentInput,
   AppointmentStatus,
   AppointmentsListResponse,
+  AppointmentTabCounts,
 } from "../../types";
 
 // ============================================================================
@@ -88,6 +89,13 @@ export async function listAppointments(
     query = query.eq("contact_id", filters.contact_id);
   }
 
+  // Filtro de tab de asignación
+  if (filters.assignment_tab === "pending_assignment") {
+    query = query.eq("type", "call").is("agent_id", null);
+  } else if (filters.assignment_tab === "assigned") {
+    query = query.or("type.eq.in_person,and(type.eq.call,agent_id.not.is.null)");
+  }
+
   // Sorting
   query = query.order(sort.sortBy, { ascending: sort.sortOrder === "asc" });
 
@@ -98,6 +106,82 @@ export async function listAppointments(
 
   if (error) throw error;
   return { data: data as AppointmentDetailed[], count: count || 0 };
+}
+
+// ============================================================================
+// Obtener conteos de tabs de asignación
+// ============================================================================
+
+export async function getAppointmentTabCounts(
+  baseFilters: Omit<AppointmentFilters, "assignment_tab"> = {}
+): Promise<AppointmentTabCounts> {
+  // Helper para aplicar filtros base
+  const applyBaseFilters = (q: ReturnType<typeof supabase.from>) => {
+    let query = q;
+
+    if (baseFilters.search) {
+      const searchTerm = `%${baseFilters.search}%`;
+      query = query.or(
+        `contact_name.ilike.${searchTerm},contact_phone.ilike.${searchTerm},title.ilike.${searchTerm}`
+      );
+    }
+
+    if (baseFilters.date_from) {
+      query = query.gte("scheduled_at", baseFilters.date_from.toISOString());
+    }
+
+    if (baseFilters.date_to) {
+      const endOfDay = new Date(baseFilters.date_to);
+      endOfDay.setHours(23, 59, 59, 999);
+      query = query.lte("scheduled_at", endOfDay.toISOString());
+    }
+
+    if (baseFilters.statuses && baseFilters.statuses.length > 0) {
+      query = query.in("status", baseFilters.statuses);
+    }
+
+    if (baseFilters.location_id) {
+      query = query.eq("location_id", baseFilters.location_id);
+    }
+
+    if (baseFilters.agent_id) {
+      query = query.eq("agent_id", baseFilters.agent_id);
+    }
+
+    if (baseFilters.contact_id) {
+      query = query.eq("contact_id", baseFilters.contact_id);
+    }
+
+    return query;
+  };
+
+  // Query pendientes: type='call' AND agent_id IS NULL
+  let pendingQuery = supabase
+    .from("v_appointments_detailed")
+    .select("*", { count: "exact", head: true })
+    .eq("type", "call")
+    .is("agent_id", null);
+  pendingQuery = applyBaseFilters(pendingQuery);
+
+  // Query asignadas: type='in_person' OR (type='call' AND agent_id IS NOT NULL)
+  let assignedQuery = supabase
+    .from("v_appointments_detailed")
+    .select("*", { count: "exact", head: true })
+    .or("type.eq.in_person,and(type.eq.call,agent_id.not.is.null)");
+  assignedQuery = applyBaseFilters(assignedQuery);
+
+  const [pendingResult, assignedResult] = await Promise.all([
+    pendingQuery,
+    assignedQuery,
+  ]);
+
+  if (pendingResult.error) throw pendingResult.error;
+  if (assignedResult.error) throw assignedResult.error;
+
+  return {
+    pending_assignment: pendingResult.count || 0,
+    assigned: assignedResult.count || 0,
+  };
 }
 
 // ============================================================================
@@ -168,9 +252,7 @@ export async function createAppointment(
   } = await supabase.auth.getUser();
 
   // Validar segun tipo
-  if (input.type === "call" && !input.agent_id) {
-    throw new Error("Las citas de llamada requieren un comercial asignado");
-  }
+  // Nota: agent_id es opcional para citas de llamada (se puede asignar despues)
   if (input.type === "in_person" && !input.location_id) {
     throw new Error("Las citas presenciales requieren una sede asignada");
   }
@@ -530,6 +612,7 @@ export async function getUpcomingAppointments(
 export const appointmentsRepo = {
   listAppointments,
   getAppointmentById,
+  getAppointmentTabCounts,
   getAppointmentStats,
   createAppointment,
   updateAppointment,

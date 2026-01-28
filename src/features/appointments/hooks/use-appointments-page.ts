@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useEffect } from "react";
-import { useAppointmentsData, useAppointmentDetail } from "./use-appointments-data";
+import { useAppointmentsData, useAppointmentDetail, useAppointmentTabCounts } from "./use-appointments-data";
 import { useAppointmentMutations } from "./use-appointment-mutations";
 import { useAppointmentsFilters } from "./use-appointments-filters";
 import { useAppointmentsPagination } from "./use-appointments-pagination";
@@ -8,7 +8,7 @@ import { useAppointmentsUrlState } from "./use-appointments-url-state";
 import { useAppointmentsPreferences } from "./use-appointments-preferences";
 import { useRealtimeAppointments } from "./use-realtime-appointments";
 import { usePrefetchAppointments } from "./use-prefetch-appointments";
-import type { AppointmentDetailed } from "../types";
+import type { AppointmentDetailed, AppointmentFilters } from "../types";
 
 // ============================================================================
 // Hook: useAppointmentsPage
@@ -36,8 +36,10 @@ export function useAppointmentsPage({
     view,
     isCreateOpen,
     urlPage,
+    assignmentTab,
     setSelectedAppointmentId,
     setView,
+    setAssignmentTab,
     openAppointmentDetail,
     closeAppointmentDetail,
     openCreateDialog,
@@ -70,7 +72,25 @@ export function useAppointmentsPage({
     setLocationId,
     setAgentId,
     resetFilters,
+    setFilters,
   } = filtersState;
+
+  // Sincronizar assignment_tab con filtros
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, assignment_tab: assignmentTab }));
+  }, [assignmentTab, setFilters]);
+
+  // Calcular filtros base para conteos de tabs (sin assignment_tab)
+  const baseFiltersForCounts = useMemo(() => {
+    const { assignment_tab, ...rest } = deferredFilters;
+    return rest as Omit<AppointmentFilters, "assignment_tab">;
+  }, [deferredFilters]);
+
+  // Fetch conteos de tabs
+  const { data: tabCounts, isLoading: tabCountsLoading } = useAppointmentTabCounts(
+    baseFiltersForCounts,
+    view === "table"
+  );
 
   // ============================================================================
   // Pagination
@@ -267,6 +287,12 @@ export function useAppointmentsPage({
     setView,
     isTableView: view === "table",
     isCalendarView: view === "calendar",
+
+    // Tabs de asignación
+    assignmentTab,
+    setAssignmentTab,
+    tabCounts,
+    tabCountsLoading,
 
     // Datos
     appointments,

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
+import type { AppointmentAssignmentTab } from "../types";
 
 // ============================================================================
 // Tipos
@@ -27,7 +28,10 @@ export function useAppointmentsUrlState() {
   const view = (searchParams.get("view") as AppointmentView) || "table";
 
   // Tab activo en el modal de detalle
-  const activeTab = (searchParams.get("tab") as AppointmentDetailTab) || "details";
+  const activeTab = (searchParams.get("detailTab") as AppointmentDetailTab) || "details";
+
+  // Tab de asignación (pendientes vs asignadas)
+  const assignmentTab = (searchParams.get("tab") as AppointmentAssignmentTab) || "assigned";
 
   // Pagina actual (para sincronizar con paginacion)
   const urlPage = parseInt(searchParams.get("page") || "1", 10);
@@ -49,7 +53,7 @@ export function useAppointmentsUrlState() {
           prev.set("appointmentId", appointmentId);
         } else {
           prev.delete("appointmentId");
-          prev.delete("tab"); // Limpiar tab cuando se cierra
+          prev.delete("detailTab"); // Limpiar detailTab cuando se cierra
         }
         return prev;
       });
@@ -72,7 +76,18 @@ export function useAppointmentsUrlState() {
   const setActiveTab = useCallback(
     (tab: AppointmentDetailTab) => {
       setSearchParams((prev) => {
+        prev.set("detailTab", tab);
+        return prev;
+      });
+    },
+    [setSearchParams]
+  );
+
+  const setAssignmentTab = useCallback(
+    (tab: AppointmentAssignmentTab) => {
+      setSearchParams((prev) => {
         prev.set("tab", tab);
+        prev.delete("page"); // Reset página al cambiar tab
         return prev;
       });
     },
@@ -129,7 +144,7 @@ export function useAppointmentsUrlState() {
     (appointmentId: string, tab: AppointmentDetailTab = "details") => {
       setSearchParams((prev) => {
         prev.set("appointmentId", appointmentId);
-        prev.set("tab", tab);
+        prev.set("detailTab", tab);
         return prev;
       });
     },
@@ -139,7 +154,7 @@ export function useAppointmentsUrlState() {
   const closeAppointmentDetail = useCallback(() => {
     setSearchParams((prev) => {
       prev.delete("appointmentId");
-      prev.delete("tab");
+      prev.delete("detailTab");
       return prev;
     });
   }, [setSearchParams]);
@@ -171,6 +186,7 @@ export function useAppointmentsUrlState() {
     selectedAppointmentId,
     view,
     activeTab,
+    assignmentTab,
     urlPage,
     calendarDate: calendarDate ? new Date(calendarDate) : null,
     isCreateOpen,
@@ -179,6 +195,7 @@ export function useAppointmentsUrlState() {
     setSelectedAppointmentId,
     setView,
     setActiveTab,
+    setAssignmentTab,
     setUrlPage,
     setCalendarDate,
     setCreateOpen,

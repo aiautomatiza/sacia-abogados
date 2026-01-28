@@ -42,7 +42,7 @@ interface CreateAppointmentRequest {
   scheduled_at: string; // ISO 8601 datetime
   duration_minutes?: number;
   timezone?: string;
-  agent_id?: string; // Required for type='call'
+  agent_id?: string; // Optional for type='call' (can be assigned later)
   location_id?: string; // Required for type='in_person'
   title?: string;
   description?: string;
@@ -285,10 +285,7 @@ async function handleCreate(supabase: SupabaseClient, payload: CreateAppointment
   }
 
   // Validate type-specific requirements
-  if (payload.type === 'call' && !payload.agent_id) {
-    return errorResponse("Appointments of type 'call' require agent_id", 400, 'VALIDATION_ERROR');
-  }
-
+  // Note: agent_id is optional for 'call' appointments (can be assigned later)
   if (payload.type === 'in_person' && !payload.location_id) {
     return errorResponse("Appointments of type 'in_person' require location_id", 400, 'VALIDATION_ERROR');
   }

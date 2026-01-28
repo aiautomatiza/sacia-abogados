@@ -124,7 +124,7 @@ appointmentsRoutes.get('/stats', async (c) => {
  *   type: 'call' | 'in_person',
  *   scheduled_at: ISO datetime,
  *   duration_minutes: number,
- *   agent_id?: UUID (required for type='call'),
+ *   agent_id?: UUID (optional for type='call'),
  *   location_id?: UUID (required for type='in_person'),
  *   exclude_appointment_id?: UUID (for updates)
  * }
@@ -173,7 +173,7 @@ appointmentsRoutes.get('/:id', async (c) => {
  *   scheduled_at: ISO datetime (required),
  *   duration_minutes?: number (default: 30),
  *   timezone?: string (default: 'Europe/Madrid'),
- *   agent_id?: UUID (required for type='call'),
+ *   agent_id?: UUID (optional for type='call'),
  *   location_id?: UUID (required for type='in_person'),
  *   title?: string,
  *   description?: string,

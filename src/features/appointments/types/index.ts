@@ -6,6 +6,7 @@ import { Database } from "@/integrations/supabase/types";
 
 export type AppointmentType = Database["public"]["Enums"]["appointment_type"];
 export type AppointmentStatus = Database["public"]["Enums"]["appointment_status"];
+export type AppointmentAssignmentTab = "pending_assignment" | "assigned";
 
 // ============================================================================
 // Tipos base de la tabla
@@ -80,6 +81,16 @@ export interface AppointmentFilters {
   location_id?: string | null;
   agent_id?: string | null;
   contact_id?: string | null;
+  assignment_tab?: AppointmentAssignmentTab;
+}
+
+// ============================================================================
+// Conteos de tabs
+// ============================================================================
+
+export interface AppointmentTabCounts {
+  pending_assignment: number;
+  assigned: number;
 }
 
 // ============================================================================
@@ -215,3 +226,8 @@ export const DEFAULT_DURATION_OPTIONS = [
   { value: 90, label: "1 hora 30 min" },
   { value: 120, label: "2 horas" },
 ];
+
+export const ASSIGNMENT_TAB_LABELS: Record<AppointmentAssignmentTab, string> = {
+  pending_assignment: "Pendientes de asignar",
+  assigned: "Asignadas",
+};

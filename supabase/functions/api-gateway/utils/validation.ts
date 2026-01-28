@@ -342,7 +342,7 @@ export const appointmentStatusSchema = z.enum([
  * Validates input for creating a new appointment
  *
  * Constraints:
- * - type='call' requires agent_id
+ * - type='call' - agent_id is optional (can be assigned later)
  * - type='in_person' requires location_id
  */
 export const createAppointmentSchema = z
@@ -371,12 +371,14 @@ export const createAppointmentSchema = z
   })
   .refine(
     (data) => {
-      if (data.type === 'call') return !!data.agent_id;
+      // agent_id is optional for 'call' appointments (can be assigned later)
+      if (data.type === 'call') return true;
+      // location_id is required for 'in_person' appointments
       if (data.type === 'in_person') return !!data.location_id;
       return false;
     },
     {
-      message: "Appointments of type 'call' require agent_id, type 'in_person' require location_id",
+      message: "Appointments of type 'in_person' require location_id",
       path: ['type'],
     }
   );

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { useAppointmentsPage } from "../hooks/use-appointments-page";
 import { AppointmentsHeader } from "./AppointmentsHeader";
+import { AppointmentsTabs } from "./AppointmentsTabs";
 import { AppointmentsFilters } from "./AppointmentsFilters";
 import { AppointmentStatsCards } from "./AppointmentStatsCards";
 import { AppointmentsTable } from "./AppointmentsTable";
@@ -23,6 +24,12 @@ export function AppointmentsPage() {
     view,
     setView,
     isTableView,
+
+    // Tabs de asignación
+    assignmentTab,
+    setAssignmentTab,
+    tabCounts,
+    tabCountsLoading,
 
     // Datos
     appointments,
@@ -148,6 +155,16 @@ export function AppointmentsPage() {
 
           {/* Stats Cards */}
           <AppointmentStatsCards stats={stats} isLoading={statsLoading} />
+
+          {/* Tabs de asignación */}
+          {isTableView && (
+            <AppointmentsTabs
+              activeTab={assignmentTab}
+              onTabChange={setAssignmentTab}
+              counts={tabCounts}
+              isLoading={tabCountsLoading}
+            />
+          )}
 
           {/* Filtros */}
           <AppointmentsFilters

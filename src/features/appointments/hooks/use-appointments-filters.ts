@@ -152,6 +152,13 @@ export function useAppointmentsFilters() {
     setFiltersState(DEFAULT_FILTERS);
   }, []);
 
+  const setFilters = useCallback(
+    (updater: AppointmentFilters | ((prev: AppointmentFilters) => AppointmentFilters)) => {
+      setFiltersState(updater);
+    },
+    []
+  );
+
   // ============================================================================
   // Computed values
   // ============================================================================
@@ -205,5 +212,6 @@ export function useAppointmentsFilters() {
     setAgentId,
     setContactId,
     resetFilters,
+    setFilters,
   };
 }

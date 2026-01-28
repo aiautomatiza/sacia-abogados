@@ -5,6 +5,7 @@ import type {
   AppointmentFilters,
   AppointmentSortConfig,
   AppointmentDetailed,
+  AppointmentTabCounts,
 } from "../types";
 
 // ============================================================================
@@ -27,6 +28,8 @@ export const appointmentsQueryKeys = {
     [APPOINTMENTS_QUERY_KEY, "detail", tenantId, id] as const,
   stats: (tenantId: string, filters: AppointmentFilters) =>
     [APPOINTMENTS_STATS_QUERY_KEY, tenantId, filters] as const,
+  tabCounts: (tenantId: string, baseFilters: Omit<AppointmentFilters, "assignment_tab">) =>
+    [APPOINTMENTS_QUERY_KEY, "tab-counts", tenantId, baseFilters] as const,
   calendar: (tenantId: string, start: string, end: string) =>
     [APPOINTMENTS_QUERY_KEY, "calendar", tenantId, start, end] as const,
   contactUpcoming: (tenantId: string, contactId: string) =>
@@ -197,5 +200,24 @@ export function useUpcomingAppointments(days: number = 7) {
     queryFn: () => appointmentsRepo.getUpcomingAppointments(days),
     enabled: !!tenantId,
     staleTime: 60000, // 1 minuto
+  });
+}
+
+// ============================================================================
+// Hook: useAppointmentTabCounts - Conteos para tabs de asignación
+// ============================================================================
+
+export function useAppointmentTabCounts(
+  baseFilters: Omit<AppointmentFilters, "assignment_tab"> = {},
+  enabled = true
+) {
+  const { profile } = useProfile();
+  const tenantId = profile?.tenant_id;
+
+  return useQuery({
+    queryKey: appointmentsQueryKeys.tabCounts(tenantId ?? "", baseFilters),
+    queryFn: () => appointmentsRepo.getAppointmentTabCounts(baseFilters),
+    enabled: enabled && !!tenantId,
+    staleTime: 30000, // 30 segundos
   });
 }

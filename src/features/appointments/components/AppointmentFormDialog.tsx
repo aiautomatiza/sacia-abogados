@@ -68,18 +68,6 @@ const appointmentSchema = z
   })
   .refine(
     (data) => {
-      if (data.type === "call") {
-        return !!data.agent_id;
-      }
-      return true;
-    },
-    {
-      message: "Selecciona un comercial para la llamada",
-      path: ["agent_id"],
-    }
-  )
-  .refine(
-    (data) => {
       if (data.type === "in_person") {
         return !!data.location_id;
       }

@@ -51,6 +51,7 @@ export function useRealtimeAppointments({
         queryKeysToInvalidate: [
           [APPOINTMENTS_QUERY_KEY, tenantId],
           [APPOINTMENTS_STATS_QUERY_KEY, tenantId],
+          [APPOINTMENTS_QUERY_KEY, "tab-counts"],
         ],
         onPayload: (payload) => {
           console.log(`[RealtimeAppointments] ${payload.eventType}`, payload.new);
