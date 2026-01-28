@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Users, Package, TrendingUp, Clock } from 'lucide-react';
+import { ArrowLeft, Users, Package, TrendingUp, Clock, Wifi, WifiOff } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,6 +14,7 @@ import { KPICard } from '@/components/ui/kpi-card';
 import {
   useCampaign,
   useCampaignContacts,
+  useRealtimeCampaignDetail,
   CampaignStatusBadge,
   CampaignChannelBadge,
   CampaignContactsTable,
@@ -25,6 +26,12 @@ export default function CampaignDetail() {
 
   const { data: campaign, isLoading: loadingCampaign } = useCampaign(id!);
   const { data: contacts, isLoading: loadingContacts } = useCampaignContacts(id!);
+
+  // Realtime updates - subscribe to campaign and batch changes
+  const { isConnected } = useRealtimeCampaignDetail({
+    campaignId: id,
+    debounceMs: 500, // Faster updates for detail view
+  });
 
   if (loadingCampaign) {
     return (
@@ -67,6 +74,20 @@ export default function CampaignDetail() {
     <div className="flex items-center gap-2">
       <CampaignChannelBadge channel={campaign.channel} />
       <CampaignStatusBadge status={campaign.status} />
+      {/* Realtime connection indicator */}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
+        {isConnected ? (
+          <>
+            <Wifi className="h-3.5 w-3.5 text-green-500" />
+            <span>En vivo</span>
+          </>
+        ) : (
+          <>
+            <WifiOff className="h-3.5 w-3.5" />
+            <span>Conectando...</span>
+          </>
+        )}
+      </div>
     </div>
   );
 

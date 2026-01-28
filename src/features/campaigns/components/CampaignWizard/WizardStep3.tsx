@@ -42,7 +42,7 @@ export function WizardStep3({ state, onImport, onBack }: WizardStep3Props) {
   return (
     <>
       <CardHeader>
-        <CardTitle>Paso 3: Confirmar e importar</CardTitle>
+        <CardTitle>Confirmar e importar</CardTitle>
         <CardDescription>Revisa el resumen antes de importar</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto">

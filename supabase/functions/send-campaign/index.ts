@@ -92,10 +92,20 @@ Deno.serve(async (req) => {
       throw new Error('No se pudo obtener el perfil del usuario');
     }
 
-    const { contact_ids, channel } = await req.json();
+    const { contact_ids, channel, phone_number_id, template_id, template_name } = await req.json();
 
     if (!contact_ids || !Array.isArray(contact_ids) || !channel) {
       throw new Error('Parámetros inválidos');
+    }
+
+    // Validate WhatsApp-specific params
+    if (channel === 'whatsapp') {
+      if (!phone_number_id) {
+        throw new Error('Se requiere phone_number_id para campañas de WhatsApp');
+      }
+      if (!template_name) {
+        throw new Error('Se requiere template_name para campañas de WhatsApp');
+      }
     }
 
     console.log(`Encolando campaña por ${channel} para tenant ${profile.tenant_id}`);
@@ -166,6 +176,16 @@ Deno.serve(async (req) => {
       tenant_id: profile.tenant_id,
       channel,
     };
+
+    // Add config for WhatsApp campaigns
+    if (channel === 'whatsapp') {
+      baseWebhookPayload.config = {
+        phone_number_id: phone_number_id,
+        template_id: template_id,
+        template_name: template_name,
+      };
+      console.log(`WhatsApp config: phone_number_id=${phone_number_id}, template=${template_name}`);
+    }
 
     // Add phone number for calls
     if (channel === 'llamadas' && settings.calls_phone_number) {

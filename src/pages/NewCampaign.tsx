@@ -1,15 +1,22 @@
+/**
+ * @fileoverview New Campaign Page
+ * @description Multi-step wizard for creating campaigns with CSV import or CRM selection
+ */
+
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import {
   WizardStep1,
   WizardStep2,
   WizardStep3,
   WizardStep4,
+  WizardStepSource,
+  WizardStepContacts,
+  CampaignStepper,
   useCampaignWizard,
 } from '@/features/campaigns';
 import { useCustomFields } from '@/features/contacts';
@@ -26,21 +33,26 @@ export default function NewCampaign() {
     requiredFields,
     hasNumeroMapping,
     goToStep,
+    goBackToSource,
+    handleSourceSelect,
     handleFileSelect,
     handleMappingChange,
     handleImport,
+    handleCrmContactsSelect,
     handleLaunchCampaign,
     handleChannelSelect,
     handleWhatsAppNumberSelect,
+    handleTemplateSelect,
     resetWizard,
+    getContactCount,
   } = useCampaignWizard({
     onSuccess: () => {
-      toast.success('Campaña creada exitosamente');
+      toast.success('Campana creada exitosamente');
       navigate('/campaigns');
     },
   });
 
-  // Show loading state
+  // Loading state
   if (loadingSettings) {
     return (
       <div className="container mx-auto py-8 px-4 flex items-center justify-center min-h-[400px]">
@@ -49,12 +61,12 @@ export default function NewCampaign() {
     );
   }
 
-  // Show disabled message if no campaigns are enabled
+  // Campaigns disabled
   if (!campaignsEnabled) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <PageHeader
-          title="Crear Nueva Campaña"
+          title="Crear Nueva Campana"
           actions={
             <Button variant="outline" onClick={() => navigate('/campaigns')}>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -65,14 +77,14 @@ export default function NewCampaign() {
         <Card className="p-8">
           <div className="flex flex-col items-center justify-center text-center">
             <Lock className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">Campañas no disponibles</h2>
+            <h2 className="text-2xl font-semibold mb-2">Campanas no disponibles</h2>
             <p className="text-muted-foreground max-w-md mb-4">
-              Tu cuenta no tiene habilitado ningún canal de campañas. Para poder crear campañas,
+              Tu cuenta no tiene habilitado ningun canal de campanas. Para poder crear campanas,
               necesitas tener habilitado al menos uno de los siguientes canales:
             </p>
             <ul className="text-sm text-muted-foreground space-y-1 mb-6">
-              <li>• Campañas de WhatsApp</li>
-              <li>• Campañas de Llamadas</li>
+              <li>Campanas de WhatsApp</li>
+              <li>Campanas de Llamadas</li>
             </ul>
             <p className="text-sm text-muted-foreground">
               Contacta con tu administrador para habilitar estos canales.
@@ -83,11 +95,20 @@ export default function NewCampaign() {
     );
   }
 
+  // Handle back navigation from launch step
+  const handleBackFromLaunch = () => {
+    if (state.sourceType === 'import') {
+      goToStep('confirm');
+    } else if (state.sourceType === 'crm') {
+      goToStep('contacts');
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <PageHeader
-        title="Crear Nueva Campaña"
-        description="Importa contactos y lanza tu campaña"
+        title="Crear Nueva Campana"
+        description="Selecciona contactos y lanza tu campana"
         actions={
           <Button variant="outline" onClick={() => navigate('/campaigns')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -96,46 +117,91 @@ export default function NewCampaign() {
         }
       />
 
-      {/* Wizard Steps Indicator */}
-      <div className="mb-6 flex items-center justify-center gap-2">
-        {[1, 2, 3, 4].map((s) => (
-          <div
-            key={s}
-            className={cn(
-              "h-2 w-12 rounded-full transition-colors",
-              step >= s ? "bg-primary" : "bg-muted"
-            )}
-          />
-        ))}
+      {/* Stepper */}
+      <div className="mb-6">
+        <CampaignStepper
+          currentStep={step}
+          sourceType={state.sourceType}
+          onStepClick={(clickedStep) => {
+            // Only allow going back to previous steps
+            if (state.sourceType === 'import') {
+              const stepOrder = ['source', 'upload', 'mapping', 'confirm', 'launch'];
+              const currentIndex = stepOrder.indexOf(step);
+              const clickedIndex = stepOrder.indexOf(clickedStep);
+              if (clickedIndex < currentIndex) {
+                goToStep(clickedStep);
+              }
+            } else if (state.sourceType === 'crm') {
+              const stepOrder = ['source', 'contacts', 'launch'];
+              const currentIndex = stepOrder.indexOf(step);
+              const clickedIndex = stepOrder.indexOf(clickedStep);
+              if (clickedIndex < currentIndex) {
+                goToStep(clickedStep);
+              }
+            }
+          }}
+        />
       </div>
 
       {/* Step Content */}
       <Card>
-        {step === 1 && <WizardStep1 onFileSelect={handleFileSelect} />}
-        {step === 2 && (
+        {/* Source Selection */}
+        {step === 'source' && (
+          <WizardStepSource
+            selectedSource={state.sourceType}
+            onSelectSource={handleSourceSelect}
+          />
+        )}
+
+        {/* Import Flow - Step 1: File Upload */}
+        {step === 'upload' && (
+          <WizardStep1
+            onFileSelect={handleFileSelect}
+            onBack={goBackToSource}
+          />
+        )}
+
+        {/* Import Flow - Step 2: Column Mapping */}
+        {step === 'mapping' && (
           <WizardStep2
             state={state}
             customFields={customFields}
             requiredFields={requiredFields}
             hasNumeroMapping={hasNumeroMapping}
             onMappingChange={handleMappingChange}
-            onBack={() => goToStep(1)}
-            onNext={() => goToStep(3)}
+            onBack={() => goToStep('upload')}
+            onNext={() => goToStep('confirm')}
           />
         )}
-        {step === 3 && (
+
+        {/* Import Flow - Step 3: Confirm Import */}
+        {step === 'confirm' && (
           <WizardStep3
             state={state}
             onImport={handleImport}
-            onBack={() => goToStep(2)}
+            onBack={() => goToStep('mapping')}
           />
         )}
-        {step === 4 && (
+
+        {/* CRM Flow - Contact Selection */}
+        {step === 'contacts' && (
+          <WizardStepContacts
+            onBack={goBackToSource}
+            onNext={handleCrmContactsSelect}
+          />
+        )}
+
+        {/* Final Step - Launch Campaign */}
+        {step === 'launch' && (
           <WizardStep4
             state={state}
+            sourceType={state.sourceType}
+            contactCount={getContactCount()}
             onChannelSelect={handleChannelSelect}
             onWhatsAppNumberSelect={handleWhatsAppNumberSelect}
+            onTemplateSelect={handleTemplateSelect}
             onLaunch={handleLaunchCampaign}
+            onBack={handleBackFromLaunch}
             onNewCampaign={resetWizard}
           />
         )}

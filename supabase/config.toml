@@ -14,7 +14,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-campaign]
-verify_jwt = true
+verify_jwt = false  # Manual JWT verification in function
 
 [functions.manage-tenants]
 verify_jwt = false

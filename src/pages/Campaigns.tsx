@@ -11,8 +11,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Plus, Lock } from "lucide-react";
-import { useCampaigns, CampaignsTable, type CampaignFilters } from "@/features/campaigns";
+import { Plus, Lock, Wifi, WifiOff } from "lucide-react";
+import { useCampaigns, CampaignsTable, useRealtimeCampaigns, type CampaignFilters } from "@/features/campaigns";
 import { useCampaignsEnabled } from "@/hooks/useTenantSettings";
 
 export default function Campaigns() {
@@ -64,6 +64,12 @@ export default function Campaigns() {
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / 50);
 
+  // Realtime updates - subscribe to campaign changes
+  const { isConnected } = useRealtimeCampaigns({
+    enabled: campaignsEnabled,
+    debounceMs: 1000,
+  });
+
   const handleChannelFilter = (channel: string) => {
     setPage(1);
     setActiveTab(channel);
@@ -106,10 +112,26 @@ export default function Campaigns() {
       <PageHeader
         title="Campañas"
         actions={
-          <Button onClick={() => navigate('/campaigns/new')} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nueva Campaña
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* Realtime connection indicator */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {isConnected ? (
+                <>
+                  <Wifi className="h-3.5 w-3.5 text-green-500" />
+                  <span className="hidden sm:inline">En vivo</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="hidden sm:inline">Conectando...</span>
+                </>
+              )}
+            </div>
+            <Button onClick={() => navigate('/campaigns/new')} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nueva Campaña
+            </Button>
+          </div>
         }
       />
 

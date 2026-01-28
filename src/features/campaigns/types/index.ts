@@ -50,7 +50,10 @@ export interface CampaignContactWithBatch extends CampaignContact {
 // Wizard types
 export type ColumnMapping = Record<string, string>;
 
-export type WizardStep = 1 | 2 | 3 | 4;
+// Source step + import steps (1-3) + crm step + final step
+export type WizardStep = 'source' | 'upload' | 'mapping' | 'confirm' | 'contacts' | 'launch';
+
+export type ContactSourceType = 'import' | 'crm' | null;
 
 export interface ImportStats {
   total: number;
@@ -58,14 +61,73 @@ export interface ImportStats {
   updated: number;
 }
 
+// Contact selection for CRM source
+export interface ContactSelectionState {
+  mode: 'manual' | 'all_filtered';
+  selectedIds: string[];
+  excludedIds: string[];
+  totalFiltered: number;
+}
+
+// Validation types
+export interface CampaignValidationError {
+  code: string;
+  message: string;
+  affectedContacts?: string[];
+}
+
+export interface CampaignValidationWarning {
+  code: string;
+  message: string;
+  count?: number;
+}
+
+export interface CampaignValidation {
+  valid: boolean;
+  errors: CampaignValidationError[];
+  warnings: CampaignValidationWarning[];
+  contactCount: number;
+}
+
+// WhatsApp template selection for campaigns
+export interface SelectedTemplate {
+  id: string;
+  templateId: string; // External template_id for Meta API
+  name: string;
+  bodyText: string;
+  headerText: string | null;
+  footerText: string | null;
+}
+
 export interface CampaignWizardState {
+  // Source selection
+  sourceType: ContactSourceType;
+
+  // Import source state
   file: File | null;
   data: any[][];
   columns: string[];
   mapping: ColumnMapping;
   stats: ImportStats | null;
   importedContactIds: string[];
+
+  // CRM source state
+  crmSelection: ContactSelectionState;
+
+  // Channel selection
   selectedChannel: 'whatsapp' | 'llamadas' | null;
-  selectedWhatsAppNumberId: string | null; // Meta Phone Number ID for WhatsApp campaigns
+  selectedWhatsAppNumberId: string | null;
+  selectedWhatsAppWabaId: string | null;
+
+  // Template selection (WhatsApp)
+  selectedTemplate: SelectedTemplate | null;
+
+  // Validation
+  validation: CampaignValidation | null;
+
+  // UI state
   loading: boolean;
 }
+
+// Re-export filter types
+export * from './filters';

@@ -28,7 +28,7 @@ export function WizardStep2({
   return (
     <>
       <CardHeader>
-        <CardTitle>Paso 2: Mapear columnas</CardTitle>
+        <CardTitle>Mapear columnas</CardTitle>
         <CardDescription>
           Define cómo se mapean las columnas del archivo a los campos del contacto
         </CardDescription>

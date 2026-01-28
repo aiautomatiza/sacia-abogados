@@ -1,6 +1,7 @@
 /**
  * @fileoverview Campaign Wizard Hook
  * @description Centralizes all wizard state and logic for creating campaigns
+ * Supports both CSV/Excel import and CRM contact selection
  */
 
 import { useState, useCallback, useMemo } from 'react';
@@ -9,28 +10,51 @@ import { toast } from 'sonner';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { useCustomFields } from '@/features/contacts';
-import type { WizardStep, CampaignWizardState, ColumnMapping, ImportStats } from '../types';
+import type {
+  WizardStep,
+  CampaignWizardState,
+  ColumnMapping,
+  ContactSourceType,
+  ContactSelectionState,
+  SelectedTemplate,
+} from '../types';
 
 interface UseCampaignWizardOptions {
   onSuccess?: () => void;
   onError?: (error: Error) => void;
 }
 
+const initialCrmSelection: ContactSelectionState = {
+  mode: 'manual',
+  selectedIds: [],
+  excludedIds: [],
+  totalFiltered: 0,
+};
+
 const initialState: CampaignWizardState = {
+  sourceType: null,
   file: null,
   data: [],
   columns: [],
   mapping: {},
   stats: null,
   importedContactIds: [],
+  crmSelection: initialCrmSelection,
   selectedChannel: null,
   selectedWhatsAppNumberId: null,
+  selectedWhatsAppWabaId: null,
+  selectedTemplate: null,
+  validation: null,
   loading: false,
 };
 
 export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptions = {}) {
-  const [step, setStep] = useState<WizardStep>(1);
+  const [step, setStep] = useState<WizardStep>('source');
   const [state, setState] = useState<CampaignWizardState>(initialState);
+
+  // Contact IDs getter for CRM selection (set by WizardStepContacts)
+  const [crmContactIdsGetter, setCrmContactIdsGetter] = useState<(() => Promise<string[]>) | null>(null);
+  const [crmSelectedCount, setCrmSelectedCount] = useState(0);
 
   const { data: customFields = [] } = useCustomFields();
 
@@ -39,10 +63,22 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     [customFields]
   );
 
+  // Navigation
   const goToStep = useCallback((newStep: WizardStep) => {
     setStep(newStep);
   }, []);
 
+  // Source selection
+  const handleSourceSelect = useCallback((source: ContactSourceType) => {
+    setState(prev => ({ ...prev, sourceType: source }));
+    if (source === 'import') {
+      setStep('upload');
+    } else if (source === 'crm') {
+      setStep('contacts');
+    }
+  }, []);
+
+  // Parse Excel file
   const parseExcelFile = useCallback((file: File): Promise<{ headers: string[]; rows: any[][] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -60,7 +96,7 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
           }) as any[][];
 
           if (jsonData.length === 0) {
-            reject(new Error('El archivo Excel está vacío'));
+            reject(new Error('El archivo Excel esta vacio'));
             return;
           }
 
@@ -93,9 +129,10 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     });
   }, []);
 
+  // Process imported data
   const processImportData = useCallback((headers: string[], rows: any[][]) => {
     if (headers.length === 0 || rows.length === 0) {
-      toast.error('El archivo no contiene datos válidos');
+      toast.error('El archivo no contiene datos validos');
       return;
     }
 
@@ -120,10 +157,11 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     });
 
     setState(prev => ({ ...prev, mapping: autoMapping }));
-    goToStep(2);
+    goToStep('mapping');
     toast.success(`Archivo procesado: ${rows.length} filas encontradas`);
   }, [goToStep]);
 
+  // File selection handler
   const handleFileSelect = useCallback(async (file: File) => {
     setState(prev => ({ ...prev, file, loading: true }));
 
@@ -135,7 +173,7 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
           complete: (result) => {
             const data = result.data as any[][];
             if (data.length === 0) {
-              toast.error('El archivo CSV está vacío');
+              toast.error('El archivo CSV esta vacio');
               setState(prev => ({ ...prev, loading: false }));
               return;
             }
@@ -181,6 +219,7 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     }
   }, [parseExcelFile, processImportData, onError]);
 
+  // Column mapping change
   const handleMappingChange = useCallback((column: string, value: string) => {
     setState(prev => ({
       ...prev,
@@ -190,9 +229,10 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
 
   const hasNumeroMapping = Object.values(state.mapping).includes('numero');
 
+  // Import contacts from file
   const handleImport = useCallback(async () => {
     if (!hasNumeroMapping) {
-      toast.error('Debe mapear al menos una columna a "Número"');
+      toast.error('Debe mapear al menos una columna a "Numero"');
       return;
     }
 
@@ -251,8 +291,8 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
         importedContactIds: data.contactIds,
       }));
 
-      toast.success(`Importación completada: ${data.stats.created} creados, ${data.stats.updated} actualizados`);
-      goToStep(4);
+      toast.success(`Importacion completada: ${data.stats.created} creados, ${data.stats.updated} actualizados`);
+      goToStep('launch');
     } catch (error: any) {
       toast.error('Error al importar contactos: ' + error.message);
       onError?.(error);
@@ -261,63 +301,143 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     }
   }, [state.data, state.columns, state.mapping, hasNumeroMapping, requiredFields, goToStep, onError]);
 
+  // CRM contact selection
+  const handleCrmContactsSelect = useCallback((
+    getContactIds: () => Promise<string[]>,
+    count: number
+  ) => {
+    setCrmContactIdsGetter(() => getContactIds);
+    setCrmSelectedCount(count);
+    goToStep('launch');
+  }, [goToStep]);
+
+  // Get final contact IDs for campaign
+  const getContactIdsForCampaign = useCallback(async (): Promise<string[]> => {
+    if (state.sourceType === 'import') {
+      return state.importedContactIds;
+    } else if (state.sourceType === 'crm' && crmContactIdsGetter) {
+      return await crmContactIdsGetter();
+    }
+    return [];
+  }, [state.sourceType, state.importedContactIds, crmContactIdsGetter]);
+
+  // Get contact count for display
+  const getContactCount = useCallback((): number => {
+    if (state.sourceType === 'import') {
+      return state.importedContactIds.length;
+    } else if (state.sourceType === 'crm') {
+      return crmSelectedCount;
+    }
+    return 0;
+  }, [state.sourceType, state.importedContactIds.length, crmSelectedCount]);
+
+  // Launch campaign
   const handleLaunchCampaign = useCallback(async () => {
     if (!state.selectedChannel) {
       toast.error('Selecciona un canal');
       return;
     }
 
-    // Validate WhatsApp number selection for WhatsApp campaigns
     if (state.selectedChannel === 'whatsapp' && !state.selectedWhatsAppNumberId) {
-      toast.error('Selecciona un número de WhatsApp');
+      toast.error('Selecciona un numero de WhatsApp');
+      return;
+    }
+
+    if (state.selectedChannel === 'whatsapp' && !state.selectedTemplate) {
+      toast.error('Selecciona una plantilla de WhatsApp');
       return;
     }
 
     setState(prev => ({ ...prev, loading: true }));
 
     try {
+      const contactIds = await getContactIdsForCampaign();
+
+      if (contactIds.length === 0) {
+        toast.error('No hay contactos seleccionados');
+        setState(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('send-campaign', {
         body: {
-          contact_ids: state.importedContactIds,
+          contact_ids: contactIds,
           channel: state.selectedChannel,
-          phone_number_id: state.selectedWhatsAppNumberId, // Include phone_number_id for WhatsApp campaigns
+          phone_number_id: state.selectedWhatsAppNumberId,
+          // Include template info for WhatsApp campaigns
+          template_id: state.selectedTemplate?.templateId,
+          template_name: state.selectedTemplate?.name,
         },
       });
 
       if (error) throw error;
 
-      const totalBatches = Math.ceil(state.importedContactIds.length / 20);
+      const totalBatches = Math.ceil(contactIds.length / 20);
       const estimatedTime = totalBatches > 1 ? `en aproximadamente ${(totalBatches - 1) * 2} minutos` : '';
 
       toast.success(
-        `¡Campaña iniciada! Se enviarán ${totalBatches} ${totalBatches === 1 ? 'batch' : 'batches'} de 20 contactos ${estimatedTime}.`
+        `Campana iniciada! Se enviaran ${totalBatches} ${totalBatches === 1 ? 'batch' : 'batches'} de 20 contactos ${estimatedTime}.`
       );
 
       onSuccess?.();
     } catch (error: any) {
-      toast.error(error.message || 'Error al lanzar campaña');
+      toast.error(error.message || 'Error al lanzar campana');
       onError?.(error);
     } finally {
       setState(prev => ({ ...prev, loading: false }));
     }
-  }, [state.selectedChannel, state.selectedWhatsAppNumberId, state.importedContactIds, onSuccess, onError]);
+  }, [state.selectedChannel, state.selectedWhatsAppNumberId, state.selectedTemplate, getContactIdsForCampaign, onSuccess, onError]);
 
+  // Channel selection
   const handleChannelSelect = useCallback((channel: 'whatsapp' | 'llamadas') => {
     setState(prev => ({
       ...prev,
       selectedChannel: channel,
-      // Reset WhatsApp number selection when changing channel
       selectedWhatsAppNumberId: channel === 'whatsapp' ? prev.selectedWhatsAppNumberId : null,
+      selectedWhatsAppWabaId: channel === 'whatsapp' ? prev.selectedWhatsAppWabaId : null,
+      selectedTemplate: channel === 'whatsapp' ? prev.selectedTemplate : null,
     }));
   }, []);
 
-  const handleWhatsAppNumberSelect = useCallback((phoneNumberId: string) => {
-    setState(prev => ({ ...prev, selectedWhatsAppNumberId: phoneNumberId }));
+  // WhatsApp number selection (with waba_id)
+  const handleWhatsAppNumberSelect = useCallback((phoneNumberId: string, wabaId: string | null) => {
+    setState(prev => ({
+      ...prev,
+      selectedWhatsAppNumberId: phoneNumberId,
+      selectedWhatsAppWabaId: wabaId,
+      // Reset template when changing number (different WABA = different templates)
+      selectedTemplate: prev.selectedWhatsAppNumberId !== phoneNumberId ? null : prev.selectedTemplate,
+    }));
   }, []);
 
+  // Template selection
+  const handleTemplateSelect = useCallback((template: SelectedTemplate | null) => {
+    setState(prev => ({ ...prev, selectedTemplate: template }));
+  }, []);
+
+  // Reset wizard
   const resetWizard = useCallback(() => {
     setState(initialState);
-    setStep(1);
+    setStep('source');
+    setCrmContactIdsGetter(null);
+    setCrmSelectedCount(0);
+  }, []);
+
+  // Go back to source selection
+  const goBackToSource = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      sourceType: null,
+      file: null,
+      data: [],
+      columns: [],
+      mapping: {},
+      stats: null,
+      importedContactIds: [],
+    }));
+    setCrmContactIdsGetter(null);
+    setCrmSelectedCount(0);
+    setStep('source');
   }, []);
 
   return {
@@ -325,13 +445,19 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     state,
     requiredFields,
     hasNumeroMapping,
+    crmSelectedCount,
     goToStep,
+    goBackToSource,
+    handleSourceSelect,
     handleFileSelect,
     handleMappingChange,
     handleImport,
+    handleCrmContactsSelect,
     handleLaunchCampaign,
     handleChannelSelect,
     handleWhatsAppNumberSelect,
+    handleTemplateSelect,
     resetWizard,
+    getContactCount,
   };
 }
