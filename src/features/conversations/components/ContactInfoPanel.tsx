@@ -50,12 +50,7 @@ export function ContactInfoPanel({ conversation, onClose, onUpdateContact, onUpd
 
   const handleUpdateField = async (field: string, value: any) => {
     if (!onUpdateContact) return;
-
-    try {
-      await onUpdateContact(contact.id, { [field]: value });
-    } catch (error) {
-      console.error("Error updating contact:", error);
-    }
+    await onUpdateContact(contact.id, { [field]: value });
   };
 
   const handleTagsChange = async (tags: string[]) => {

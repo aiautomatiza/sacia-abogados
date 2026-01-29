@@ -88,7 +88,7 @@ export const uuidParamSchema = z.string().uuid('Invalid ID format');
 export const createContactSchema = z.object({
   numero: z.string()
     .min(1, 'Phone number is required')
-    .max(20, 'Phone number too long'),
+    .max(50, 'Phone number too long'),
   nombre: z.string()
     .max(200, 'Name too long')
     .optional(),
@@ -104,7 +104,7 @@ export const createContactSchema = z.object({
 export const updateContactSchema = z.object({
   numero: z.string()
     .min(1, 'Phone number is required')
-    .max(20, 'Phone number too long')
+    .max(50, 'Phone number too long')
     .optional(),
   nombre: z.string()
     .max(200, 'Name too long')
