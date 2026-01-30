@@ -34,6 +34,7 @@ interface UpdateStatusRequest {
   contact_id: string;
   status_id?: string;      // UUID - optional if status_name provided
   status_name?: string;    // Name lookup - optional if status_id provided
+  sync_middleware?: boolean; // Whether to sync with middleware (default: true)
 }
 
 interface ContactResult {
@@ -54,8 +55,8 @@ interface StatusResult {
 /**
  * Normalizes a Spanish phone number to E.164 format
  */
-function normalizeSpanishPhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+function normalizeSpanishPhone(phone: string | number): string {
+  let cleaned = String(phone).replace(/[\s\-\(\)\.]/g, '');
 
   if (cleaned.startsWith('+34')) {
     return cleaned;
@@ -132,18 +133,25 @@ async function handleLookup(
     console.log(`[external-contact-api/lookup] Looking for numero: ${normalizedNumero} or ${numeroWithoutPlus}`);
 
     // Search for both formats: +34xxx and 34xxx
-    const { data: contactByNumero, error: numeroError } = await supabaseAdmin
+    // Use .in() instead of .or() to avoid URL encoding issues with the + character
+    const numerosToSearch = [normalizedNumero];
+    if (numeroWithoutPlus !== normalizedNumero) {
+      numerosToSearch.push(numeroWithoutPlus);
+    }
+
+    const { data: contactsByNumero, error: numeroError } = await supabaseAdmin
       .from('crm_contacts')
       .select('id, nombre, numero')
       .eq('tenant_id', payload.tenant_id)
-      .or(`numero.eq.${normalizedNumero},numero.eq.${numeroWithoutPlus}`)
-      .maybeSingle();
+      .in('numero', numerosToSearch)
+      .limit(1);
 
     if (numeroError) {
-      console.error('[external-contact-api/lookup] Error looking up by numero:', numeroError);
+      console.error('[external-contact-api/lookup] Error looking up by numero:', JSON.stringify(numeroError));
       return errorResponse('Database error', 500);
     }
 
+    const contactByNumero = contactsByNumero?.[0];
     if (contactByNumero) {
       console.log(`[external-contact-api/lookup] Found contact by numero: ${contactByNumero.id}`);
       return successResponse({
@@ -298,12 +306,14 @@ async function handleUpdateStatus(
 
   console.log(`[external-contact-api/update-status] Contact ${payload.contact_id} status updated to ${status.id} (${status.name})`);
 
-  // Step 5: Sync with Pipedrive middleware
+  // Step 5: Sync with Pipedrive middleware (skip if sync_middleware is explicitly false)
+  const shouldSyncMiddleware = payload.sync_middleware !== false && String(payload.sync_middleware).toLowerCase() !== 'false';
+  console.log(`[external-contact-api/update-status] sync_middleware param: ${JSON.stringify(payload.sync_middleware)} (type: ${typeof payload.sync_middleware}) -> shouldSync: ${shouldSyncMiddleware}`);
   let middlewareSynced = false;
   const middlewareUrl = Deno.env.get('MIDDLEWARE_URL');
   const internalApiKey = Deno.env.get('INTERNAL_API_KEY');
 
-  if (middlewareUrl && internalApiKey) {
+  if (shouldSyncMiddleware && middlewareUrl && internalApiKey) {
     try {
       const middlewarePayload = {
         title: contact.nombre || 'Sin nombre',
@@ -334,6 +344,8 @@ async function handleUpdateStatus(
     } catch (middlewareError) {
       console.error('[external-contact-api/update-status] Middleware sync error:', middlewareError);
     }
+  } else if (!shouldSyncMiddleware) {
+    console.log('[external-contact-api/update-status] Middleware sync skipped (sync_middleware=false)');
   } else {
     console.warn('[external-contact-api/update-status] MIDDLEWARE_URL or INTERNAL_API_KEY not configured, skipping sync');
   }
