@@ -509,8 +509,8 @@ async function handleUpdateAttributes(
 
   // Step 3: Get custom field definitions for this tenant
   const { data: customFields, error: fieldsError } = await supabaseAdmin
-    .from('crm_custom_fields')
-    .select('field_name, field_type, is_required, options')
+    .from('custom_fields')
+    .select('field_name, field_type, required, options')
     .eq('tenant_id', payload.tenant_id);
 
   if (fieldsError) {
@@ -519,12 +519,12 @@ async function handleUpdateAttributes(
   }
 
   // Build a map of field definitions for quick lookup
-  const fieldMap = new Map<string, { field_type: string; is_required: boolean; options: string[] | null }>();
+  const fieldMap = new Map<string, { field_type: string; required: boolean; options: string[] | null }>();
   for (const field of customFields || []) {
     fieldMap.set(field.field_name, {
       field_type: field.field_type,
-      is_required: field.is_required,
-      options: field.options,
+      required: field.required ?? false,
+      options: field.options as string[] | null,
     });
   }
 
@@ -543,7 +543,7 @@ async function handleUpdateAttributes(
       continue;
     }
 
-    const error = validateFieldValue(value, fieldDef.field_type, fieldDef.options, fieldDef.is_required);
+    const error = validateFieldValue(value, fieldDef.field_type, fieldDef.options, fieldDef.required);
     if (error) {
       validationErrors.push({ field: fieldName, message: error });
     } else {
