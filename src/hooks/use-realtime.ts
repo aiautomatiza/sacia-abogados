@@ -63,7 +63,7 @@ export interface UseRealtimeReturn {
 // ============================================================================
 
 const MAX_RETRIES = 3;
-const BASE_RETRY_DELAY_MS = 2000;
+const BASE_RETRY_DELAY_MS = 1000;
 
 export function useRealtime({
   subscriptions,
