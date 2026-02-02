@@ -9,10 +9,12 @@
  * Endpoints:
  * - POST /functions/v1/external-contact-api/lookup - Find contact by tenant_id + email/numero
  * - POST /functions/v1/external-contact-api/update-status - Update contact status and sync with Pipedrive
+ * - POST /functions/v1/external-contact-api/update-attributes - Update contact custom field attributes
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizePhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +39,17 @@ interface UpdateStatusRequest {
   sync_middleware?: boolean; // Whether to sync with middleware (default: true)
 }
 
+interface UpdateAttributesRequest {
+  tenant_id: string;
+  contact_id: string;
+  attributes: Record<string, any>;
+}
+
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
 interface ContactResult {
   id: string;
   nombre: string | null;
@@ -51,34 +64,6 @@ interface StatusResult {
 // ============================================================================
 // Utilities
 // ============================================================================
-
-/**
- * Normalizes a Spanish phone number to E.164 format
- */
-function normalizeSpanishPhone(phone: string | number): string {
-  let cleaned = String(phone).replace(/[\s\-\(\)\.]/g, '');
-
-  if (cleaned.startsWith('+34')) {
-    return cleaned;
-  }
-
-  if (cleaned.startsWith('0034')) {
-    return '+34' + cleaned.slice(4);
-  }
-
-  if (cleaned.startsWith('34') && cleaned.length === 11) {
-    const withoutPrefix = cleaned.slice(2);
-    if (/^[6789]\d{8}$/.test(withoutPrefix)) {
-      return '+34' + withoutPrefix;
-    }
-  }
-
-  if (/^[6789]\d{8}$/.test(cleaned)) {
-    return '+34' + cleaned;
-  }
-
-  return cleaned.startsWith('+') ? cleaned : cleaned;
-}
 
 /**
  * Creates a JSON error response
@@ -126,24 +111,17 @@ async function handleLookup(
 
   // Try lookup by numero first (most common)
   if (payload.numero) {
-    const normalizedNumero = normalizeSpanishPhone(payload.numero);
-    // Also try without + prefix (some contacts stored as "34xxx" instead of "+34xxx")
-    const numeroWithoutPlus = normalizedNumero.startsWith('+') ? normalizedNumero.slice(1) : normalizedNumero;
+    const normalizedNumero = normalizePhone(String(payload.numero));
+    // Also search with '+' prefix for pre-migration data compatibility
+    const numeroWithPlus = '+' + normalizedNumero;
 
-    console.log(`[external-contact-api/lookup] Looking for numero: ${normalizedNumero} or ${numeroWithoutPlus}`);
-
-    // Search for both formats: +34xxx and 34xxx
-    // Use .in() instead of .or() to avoid URL encoding issues with the + character
-    const numerosToSearch = [normalizedNumero];
-    if (numeroWithoutPlus !== normalizedNumero) {
-      numerosToSearch.push(numeroWithoutPlus);
-    }
+    console.log(`[external-contact-api/lookup] Looking for numero: ${normalizedNumero} or ${numeroWithPlus}`);
 
     const { data: contactsByNumero, error: numeroError } = await supabaseAdmin
       .from('crm_contacts')
       .select('id, nombre, numero')
       .eq('tenant_id', payload.tenant_id)
-      .in('numero', numerosToSearch)
+      .in('numero', [normalizedNumero, numeroWithPlus])
       .limit(1);
 
     if (numeroError) {
@@ -364,6 +342,255 @@ async function handleUpdateStatus(
   });
 }
 
+/**
+ * Validates a field value against its field_type definition
+ */
+function validateFieldValue(
+  value: any,
+  fieldType: string,
+  options: string[] | null,
+  required: boolean
+): string | null {
+  // Check required
+  if (required && (value === null || value === undefined || value === '')) {
+    return 'Field is required';
+  }
+
+  // Allow null/empty for non-required fields (clears the value)
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  switch (fieldType) {
+    case 'text':
+    case 'textarea':
+      if (typeof value !== 'string') {
+        return 'Value must be a string';
+      }
+      return null;
+
+    case 'email': {
+      if (typeof value !== 'string') {
+        return 'Value must be a string';
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        return 'Invalid email format';
+      }
+      return null;
+    }
+
+    case 'phone': {
+      if (typeof value !== 'string') {
+        return 'Value must be a string';
+      }
+      const phoneRegex = /^\+?[0-9]{8,15}$/;
+      if (!phoneRegex.test(value)) {
+        return 'Invalid phone format (expected 8-15 digits, optional + prefix)';
+      }
+      return null;
+    }
+
+    case 'number': {
+      if (typeof value === 'number') {
+        if (isNaN(value)) return 'Invalid number';
+        return null;
+      }
+      if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
+        return null;
+      }
+      return 'Value must be a number';
+    }
+
+    case 'date': {
+      if (typeof value !== 'string') {
+        return 'Value must be a date string';
+      }
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(value)) {
+        return 'Invalid date format (expected YYYY-MM-DD)';
+      }
+      const parsed = new Date(value);
+      if (isNaN(parsed.getTime())) {
+        return 'Invalid date value';
+      }
+      return null;
+    }
+
+    case 'url': {
+      if (typeof value !== 'string') {
+        return 'Value must be a string';
+      }
+      const urlRegex = /^https?:\/\/.+\..+/;
+      if (!urlRegex.test(value)) {
+        return 'Invalid URL format (must start with http:// or https://)';
+      }
+      return null;
+    }
+
+    case 'select': {
+      if (typeof value !== 'string') {
+        return 'Value must be a string';
+      }
+      if (options && options.length > 0 && !options.includes(value)) {
+        return `Invalid option. Allowed values: ${options.join(', ')}`;
+      }
+      return null;
+    }
+
+    case 'checkbox': {
+      if (typeof value !== 'boolean') {
+        return 'Value must be a boolean';
+      }
+      return null;
+    }
+
+    default:
+      // Unknown field type, allow any value
+      return null;
+  }
+}
+
+/**
+ * Handles the /update-attributes endpoint
+ * Updates a contact's custom field attributes with validation
+ */
+async function handleUpdateAttributes(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  payload: UpdateAttributesRequest
+): Promise<Response> {
+  console.log('[external-contact-api/update-attributes] Processing update request');
+
+  // Validate required fields
+  if (!payload.tenant_id) {
+    return errorResponse('Missing required field: tenant_id', 400);
+  }
+
+  if (!payload.contact_id) {
+    return errorResponse('Missing required field: contact_id', 400);
+  }
+
+  if (!payload.attributes || typeof payload.attributes !== 'object' || Object.keys(payload.attributes).length === 0) {
+    return errorResponse('Missing or empty required field: attributes', 400);
+  }
+
+  // Step 1: Verify tenant exists
+  const { data: tenant, error: tenantError } = await supabaseAdmin
+    .from('tenants')
+    .select('id')
+    .eq('id', payload.tenant_id)
+    .maybeSingle();
+
+  if (tenantError) {
+    console.error('[external-contact-api/update-attributes] Error checking tenant:', tenantError);
+    return errorResponse('Database error', 500);
+  }
+
+  if (!tenant) {
+    return errorResponse('Tenant not found', 404);
+  }
+
+  // Step 2: Verify contact exists and belongs to tenant
+  const { data: contact, error: contactError } = await supabaseAdmin
+    .from('crm_contacts')
+    .select('id, nombre, numero, attributes')
+    .eq('id', payload.contact_id)
+    .eq('tenant_id', payload.tenant_id)
+    .maybeSingle();
+
+  if (contactError) {
+    console.error('[external-contact-api/update-attributes] Error checking contact:', contactError);
+    return errorResponse('Database error', 500);
+  }
+
+  if (!contact) {
+    return errorResponse('Contact not found or does not belong to tenant', 404);
+  }
+
+  // Step 3: Get custom field definitions for this tenant
+  const { data: customFields, error: fieldsError } = await supabaseAdmin
+    .from('crm_custom_fields')
+    .select('field_name, field_type, is_required, options')
+    .eq('tenant_id', payload.tenant_id);
+
+  if (fieldsError) {
+    console.error('[external-contact-api/update-attributes] Error fetching custom fields:', fieldsError);
+    return errorResponse('Database error', 500);
+  }
+
+  // Build a map of field definitions for quick lookup
+  const fieldMap = new Map<string, { field_type: string; is_required: boolean; options: string[] | null }>();
+  for (const field of customFields || []) {
+    fieldMap.set(field.field_name, {
+      field_type: field.field_type,
+      is_required: field.is_required,
+      options: field.options,
+    });
+  }
+
+  // Step 4: Validate each attribute
+  const validationErrors: ValidationError[] = [];
+  const validatedAttributes: Record<string, any> = {};
+
+  for (const [fieldName, value] of Object.entries(payload.attributes)) {
+    const fieldDef = fieldMap.get(fieldName);
+
+    if (!fieldDef) {
+      validationErrors.push({
+        field: fieldName,
+        message: 'Field not found for this tenant',
+      });
+      continue;
+    }
+
+    const error = validateFieldValue(value, fieldDef.field_type, fieldDef.options, fieldDef.is_required);
+    if (error) {
+      validationErrors.push({ field: fieldName, message: error });
+    } else {
+      validatedAttributes[fieldName] = value;
+    }
+  }
+
+  // If there are validation errors, return them
+  if (validationErrors.length > 0) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Validation failed',
+        validation_errors: validationErrors,
+      }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Step 5: Merge attributes (existing + new)
+  const existingAttributes = (contact as any).attributes || {};
+  const mergedAttributes = { ...existingAttributes, ...validatedAttributes };
+
+  // Step 6: Update contact attributes
+  const { error: updateError } = await supabaseAdmin
+    .from('crm_contacts')
+    .update({ attributes: mergedAttributes })
+    .eq('id', payload.contact_id);
+
+  if (updateError) {
+    console.error('[external-contact-api/update-attributes] Error updating attributes:', updateError);
+    return errorResponse('Error updating contact attributes', 500);
+  }
+
+  console.log(`[external-contact-api/update-attributes] Contact ${payload.contact_id} attributes updated: ${Object.keys(validatedAttributes).join(', ')}`);
+
+  return successResponse({
+    contact: {
+      id: contact.id,
+      nombre: (contact as any).nombre,
+      numero: (contact as any).numero,
+    },
+    updated_attributes: validatedAttributes,
+    attributes: mergedAttributes,
+  });
+}
+
 // ============================================================================
 // Main Handler
 // ============================================================================
@@ -428,8 +655,11 @@ serve(async (req) => {
       case 'update-status':
         return await handleUpdateStatus(supabaseAdmin, payload as UpdateStatusRequest);
 
+      case 'update-attributes':
+        return await handleUpdateAttributes(supabaseAdmin, payload as UpdateAttributesRequest);
+
       default:
-        return errorResponse(`Unknown action: ${action}. Valid actions: lookup, update-status`, 400);
+        return errorResponse(`Unknown action: ${action}. Valid actions: lookup, update-status, update-attributes`, 400);
     }
   } catch (error) {
     console.error('[external-contact-api] Unexpected error:', error);
