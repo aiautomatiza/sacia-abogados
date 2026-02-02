@@ -26,31 +26,36 @@ export function useRealtimeConversations({
   /**
    * TIER S: Actualización granular de conversación en lista infinita
    * En lugar de invalidar toda la lista, actualizamos solo la conversación afectada
+   * Usa setQueriesData (fuzzy match) para encontrar queries con cualquier combinación de filtros
    */
   const updateConversationInList = useCallback(
     (conversationId: string, updates: Partial<ConversationWithContact>) => {
-      const queryKey = ["conversations", "infinite", tenantId];
+      const queryKeyPrefix = ["conversations", "infinite", tenantId];
 
-      queryClient.setQueryData(queryKey, (old: any) => {
-        if (!old?.pages) return old;
+      queryClient.setQueriesData(
+        { queryKey: queryKeyPrefix },
+        (old: any) => {
+          if (!old?.pages) return old;
 
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            conversations: page.conversations.map((conv: ConversationWithContact) =>
-              conv.id === conversationId ? { ...conv, ...updates } : conv
-            ),
-          })),
-        };
-      });
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => ({
+              ...page,
+              conversations: page.conversations.map((conv: ConversationWithContact) =>
+                conv.id === conversationId ? { ...conv, ...updates } : conv
+              ),
+            })),
+          };
+        }
+      );
     },
     [tenantId, queryClient]
   );
 
   /**
    * TIER S: Handler optimizado para eventos de mensajes
-   * Actualiza last_message_at, last_message_preview, unread_count in-place
+   * Actualiza last_message_at, last_message_preview in-place
+   * y luego invalida la lista para obtener orden y unread_count correctos
    */
   const handleMessageEvent = useCallback(
     (payload: RealtimePayload) => {
@@ -67,24 +72,25 @@ export function useRealtimeConversations({
           sender_type?: string;
         };
 
-        // Actualizar conversación en la lista sin invalidar
+        // Actualización optimista: preview y timestamp instantáneos
         updateConversationInList(conversationId, {
           last_message_at: newMessage.created_at || new Date().toISOString(),
           last_message_preview: newMessage.content?.substring(0, 100) || null,
-          // Solo incrementar unread si es mensaje del contacto
-          ...(newMessage.sender_type === "contact" && {
-            unread_count: undefined, // Se recalculará con invalidación selectiva
-          }),
         });
 
-        // Invalidar conversación específica para obtener unread_count actualizado
+        // Invalidar lista de conversaciones para actualizar orden, unread_count, etc.
         queryClient.invalidateQueries({
-          queryKey: ["conversation", conversationId],
-          exact: true,
+          queryKey: ["conversations", "infinite", tenantId],
+        });
+
+        // Fallback: invalidar mensajes de esta conversación por si la suscripción
+        // filtrada de useRealtimeMessages no recibe el evento (depende de REPLICA IDENTITY)
+        queryClient.invalidateQueries({
+          queryKey: ["conversation-messages", conversationId],
         });
       }
     },
-    [updateConversationInList, queryClient]
+    [updateConversationInList, queryClient, tenantId]
   );
 
   /**

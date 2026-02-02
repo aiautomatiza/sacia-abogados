@@ -43,20 +43,27 @@ export function useRealtimeMessages({
 
   /**
    * Handler optimista para mensajes nuevos - inserta directamente en cache
-   * sin esperar invalidación/refetch
+   * sin esperar invalidación/refetch.
+   * Incluye fallback a invalidateQueries cuando el cache está vacío.
    */
   const handleMessagePayload = useCallback(
     (payload: RealtimePayload) => {
       if (!conversationId) return;
 
       const queryKey = ["conversation-messages", conversationId];
+      const currentData = queryClient.getQueryData(queryKey) as any;
+
+      // Fallback: si no hay datos en cache, invalidar para forzar refetch
+      if (!currentData?.messages) {
+        queryClient.invalidateQueries({ queryKey });
+        return;
+      }
 
       if (payload.eventType === "INSERT") {
-        // Inserción optimista - agregar mensaje al final del array
+        const newMessage = payload.new as MessageWithSender;
+
         queryClient.setQueryData(queryKey, (old: any) => {
           if (!old?.messages) return old;
-
-          const newMessage = payload.new as MessageWithSender;
 
           // Evitar duplicados (puede llegar por optimistic update de useSendMessage)
           const exists = old.messages.some((m: MessageWithSender) =>
