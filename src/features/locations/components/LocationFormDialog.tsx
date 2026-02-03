@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocationMutations } from "../hooks/use-location-mutations";
 import type { TenantLocation, CreateLocationInput, OperatingHours } from "../types";
 import { DAYS_OF_WEEK, TIMEZONES, parseOperatingHours } from "../types";
@@ -213,8 +212,8 @@ export function LocationFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             {isEditing ? "Editar Sede" : "Nueva Sede"}
           </DialogTitle>
@@ -226,8 +225,8 @@ export function LocationFormDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <ScrollArea className="max-h-[60vh] pr-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-0 flex-1">
+            <div className="flex-1 overflow-y-auto pr-4 min-h-0">
               <Tabs defaultValue="general" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="general">General</TabsTrigger>
@@ -530,9 +529,9 @@ export function LocationFormDialog({
                   ))}
                 </TabsContent>
               </Tabs>
-            </ScrollArea>
+            </div>
 
-            <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
+            <div className="flex-shrink-0 flex justify-end gap-2 pt-4 mt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
