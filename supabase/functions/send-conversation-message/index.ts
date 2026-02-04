@@ -19,6 +19,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Declare message_id at outer scope so the catch block can update its status
+  let message_id: string | undefined;
+
   try {
     // Initialize Supabase client with service role
     const supabaseClient = createClient(
@@ -32,7 +35,9 @@ serve(async (req) => {
       }
     );
 
-    const { message_id, conversation_id, phone_number_id }: SendMessagePayload = await req.json();
+    const payload: SendMessagePayload = await req.json();
+    message_id = payload.message_id;
+    const { conversation_id, phone_number_id } = payload;
 
     if (!message_id || !conversation_id) {
       return new Response(
@@ -259,18 +264,22 @@ serve(async (req) => {
           }
 
           // Update message status to sent
-          await supabaseClient
+          const { error: updateError } = await supabaseClient
             .from('conversation_messages')
             .update({
               delivery_status: 'sent',
               external_message_id: whatsappMessageId,
               metadata: {
-                ...message.metadata,
+                ...(typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {}),
                 webhook_sent_at: new Date().toISOString(),
                 external_response: responseData,
               }
             })
             .eq('id', message_id);
+
+          if (updateError) {
+            console.error('[Webhook] Failed to update message status to sent:', updateError);
+          }
 
           return new Response(
             JSON.stringify({ success: true, message: 'Message sent successfully' }),
@@ -298,18 +307,22 @@ serve(async (req) => {
 
     // All retries failed
     console.error('[Webhook] All retries failed:', lastError);
-    await supabaseClient
+    const { error: failUpdateError } = await supabaseClient
       .from('conversation_messages')
       .update({
         delivery_status: 'failed',
         error_message: lastError,
         metadata: {
-          ...message.metadata,
+          ...(typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {}),
           error: lastError,
           failed_at: new Date().toISOString()
         }
       })
       .eq('id', message_id);
+
+    if (failUpdateError) {
+      console.error('[Webhook] Failed to update message status to failed:', failUpdateError);
+    }
 
     return new Response(
       JSON.stringify({ error: 'Failed to send message after retries', details: lastError }),
@@ -318,6 +331,27 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[Webhook] Unexpected error:', error);
+
+    // Best-effort update of delivery_status so messages don't stay stuck at "sending"
+    if (message_id) {
+      try {
+        const fallbackClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        );
+        await fallbackClient
+          .from('conversation_messages')
+          .update({
+            delivery_status: 'failed',
+            error_message: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
+          })
+          .eq('id', message_id);
+      } catch (updateErr) {
+        console.error('[Webhook] Failed to update message status after unexpected error:', updateErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -659,11 +659,29 @@ export const sendMessage = async (
           message: fnError.message,
           context: (fnError as any).context,
         });
+        // Update delivery_status so the message doesn't stay stuck at "sending"
+        await supabase
+          .from("conversation_messages")
+          .update({
+            delivery_status: "failed" as MessageDeliveryStatus,
+            error_message: `Edge Function error: ${fnError.message}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", message.id);
       } else {
         console.log("[SendMessage] Edge Function response:", fnData);
       }
     } catch (err) {
       console.error("[SendMessage] Exception invoking Edge Function:", err);
+      // Update delivery_status so the message doesn't stay stuck at "sending"
+      await supabase
+        .from("conversation_messages")
+        .update({
+          delivery_status: "failed" as MessageDeliveryStatus,
+          error_message: `Edge Function exception: ${err instanceof Error ? err.message : String(err)}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", message.id);
     }
   }
 
