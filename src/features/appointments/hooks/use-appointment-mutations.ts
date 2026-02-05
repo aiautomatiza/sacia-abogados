@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useProfile } from "@/hooks/useProfile";
 import { appointmentsRepo } from "../lib/repos/appointments.repo";
 import {
   APPOINTMENTS_QUERY_KEY,
@@ -10,7 +9,6 @@ import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
   AppointmentStatus,
-  APPOINTMENT_STATUS_LABELS,
 } from "../types";
 
 // ============================================================================
@@ -33,18 +31,14 @@ const STATUS_MESSAGES: Record<AppointmentStatus, string> = {
 
 export function useAppointmentMutations() {
   const queryClient = useQueryClient();
-  const { profile } = useProfile();
-  const tenantId = profile?.tenant_id;
 
   const invalidateQueries = () => {
-    if (tenantId) {
-      queryClient.invalidateQueries({
-        queryKey: [APPOINTMENTS_QUERY_KEY, tenantId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [APPOINTMENTS_STATS_QUERY_KEY, tenantId],
-      });
-    }
+    queryClient.invalidateQueries({
+      queryKey: [APPOINTMENTS_QUERY_KEY],
+    });
+    queryClient.invalidateQueries({
+      queryKey: [APPOINTMENTS_STATS_QUERY_KEY],
+    });
   };
 
   // Crear appointment

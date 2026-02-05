@@ -85,14 +85,12 @@ export function useAppointmentsData({
   });
 
   const refetch = () => {
-    if (tenantId) {
-      queryClient.invalidateQueries({
-        queryKey: [APPOINTMENTS_QUERY_KEY, tenantId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [APPOINTMENTS_STATS_QUERY_KEY, tenantId],
-      });
-    }
+    queryClient.invalidateQueries({
+      queryKey: [APPOINTMENTS_QUERY_KEY],
+    });
+    queryClient.invalidateQueries({
+      queryKey: [APPOINTMENTS_STATS_QUERY_KEY],
+    });
   };
 
   return {
