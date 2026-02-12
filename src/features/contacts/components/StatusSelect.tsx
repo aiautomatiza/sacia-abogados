@@ -12,6 +12,7 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
 } from '@/components/ui/command';
 import {
   Popover,
@@ -78,6 +79,7 @@ export function StatusSelect({
       <PopoverContent className="w-full p-0">
         <Command>
           <CommandInput placeholder="Buscar estado..." />
+          <CommandList>
           <CommandEmpty>No se encontraron estados.</CommandEmpty>
           <CommandGroup>
             {allowClear && (
@@ -117,6 +119,7 @@ export function StatusSelect({
               </CommandItem>
             ))}
           </CommandGroup>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
