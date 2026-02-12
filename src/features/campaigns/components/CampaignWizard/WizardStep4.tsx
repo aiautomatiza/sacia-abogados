@@ -16,9 +16,11 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, Loader2, Users, Rocket, FileText, AlertCircle } from 'lucide-react';
 import { ChannelSelector } from '../ChannelSelector';
+import { TemplateVariableMapper } from './TemplateVariableMapper';
 import { useWhatsAppNumbers } from '@/features/conversations/hooks/useWhatsAppNumbers';
 import { useWhatsAppTemplatesByWaba, useWhatsAppTemplates } from '@/features/conversations/hooks/useWhatsAppTemplates';
-import type { CampaignWizardState, ContactSourceType, SelectedTemplate } from '../../types';
+import { useCustomFields } from '@/features/contacts';
+import type { CampaignWizardState, ContactSourceType, SelectedTemplate, TemplateVariableMapping } from '../../types';
 
 interface WizardStep4Props {
   state: CampaignWizardState;
@@ -27,6 +29,7 @@ interface WizardStep4Props {
   onChannelSelect: (channel: 'whatsapp' | 'llamadas') => void;
   onWhatsAppNumberSelect: (phoneNumberId: string, wabaId: string | null) => void;
   onTemplateSelect: (template: SelectedTemplate | null) => void;
+  onVariableMappingChange: (mapping: TemplateVariableMapping[]) => void;
   onLaunch: () => void;
   onBack: () => void;
   onNewCampaign: () => void;
@@ -39,12 +42,16 @@ export function WizardStep4({
   onChannelSelect,
   onWhatsAppNumberSelect,
   onTemplateSelect,
+  onVariableMappingChange,
   onLaunch,
   onBack,
   onNewCampaign,
 }: WizardStep4Props) {
   const { data: whatsappNumbers = [], isLoading: loadingNumbers } = useWhatsAppNumbers();
   const activeNumbers = whatsappNumbers.filter(n => n.status === 'active');
+
+  // Load custom fields for variable mapping
+  const { data: customFields = [] } = useCustomFields();
 
   // Get templates filtered by WABA if available, otherwise all tenant templates
   const { data: templatesByWaba = [], isLoading: loadingTemplatesByWaba } = useWhatsAppTemplatesByWaba(
@@ -69,6 +76,26 @@ export function WizardStep4({
   const handleTemplateChange = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
+      // Parse variables from template.variables field if available
+      let variables = Array.isArray(template.variables) && template.variables.length > 0
+        ? template.variables.map((v: any) => ({
+            name: v.name || '',
+            position: v.position || 0,
+          }))
+        : [];
+
+      // If no variables in the field, extract from body_text (e.g., {{1}}, {{2}})
+      if (variables.length === 0 && template.body_text) {
+        const matches = template.body_text.match(/\{\{(\d+)\}\}/g);
+        if (matches) {
+          const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
+          variables = positions.sort((a, b) => a - b).map(pos => ({
+            name: `Variable ${pos}`,
+            position: pos,
+          }));
+        }
+      }
+
       onTemplateSelect({
         id: template.id,
         templateId: template.template_id,
@@ -76,15 +103,24 @@ export function WizardStep4({
         bodyText: template.body_text,
         headerText: template.header_text,
         footerText: template.footer_text,
+        variables,
       });
     } else {
       onTemplateSelect(null);
     }
   };
 
+  // Check if template has variables and all are mapped
+  const hasTemplateVariables = (state.selectedTemplate?.variables?.length ?? 0) > 0;
+  const allVariablesMapped = !hasTemplateVariables || state.variableMapping.every((m) => {
+    if (m.source.type === 'static_value') return !!m.source.value;
+    if (m.source.type === 'custom_field') return !!m.source.fieldName;
+    return true;
+  }) && state.variableMapping.length === (state.selectedTemplate?.variables?.length ?? 0);
+
   const canLaunch =
     state.selectedChannel &&
-    (state.selectedChannel !== 'whatsapp' || (state.selectedWhatsAppNumberId && state.selectedTemplate)) &&
+    (state.selectedChannel !== 'whatsapp' || (state.selectedWhatsAppNumberId && state.selectedTemplate && allVariablesMapped)) &&
     !state.loading &&
     contactCount > 0;
 
@@ -200,8 +236,8 @@ export function WizardStep4({
               </div>
             )}
 
-            {/* Template Preview */}
-            {state.selectedTemplate && (
+            {/* Template Preview (only when no variables) */}
+            {state.selectedTemplate && !hasTemplateVariables && (
               <Card className="p-3 bg-background">
                 <div className="flex items-start gap-2 mb-2">
                   <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -217,6 +253,17 @@ export function WizardStep4({
                   )}
                 </div>
               </Card>
+            )}
+
+            {/* Variable Mapper (when template has variables) */}
+            {state.selectedTemplate && hasTemplateVariables && (
+              <TemplateVariableMapper
+                variables={state.selectedTemplate.variables}
+                customFields={customFields}
+                mapping={state.variableMapping}
+                bodyText={state.selectedTemplate.bodyText}
+                onMappingChange={onVariableMappingChange}
+              />
             )}
 
             {/* Warning if no templates */}

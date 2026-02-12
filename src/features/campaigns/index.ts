@@ -23,6 +23,7 @@ export { WizardStep3 } from './components/CampaignWizard/WizardStep3';
 export { WizardStep4 } from './components/CampaignWizard/WizardStep4';
 export { WizardStepSource } from './components/CampaignWizard/WizardStepSource';
 export { WizardStepContacts } from './components/CampaignWizard/WizardStepContacts';
+export { TemplateVariableMapper } from './components/CampaignWizard/TemplateVariableMapper';
 export { FileUploader } from './components/FileUploader';
 export { ColumnMappingTable } from './components/ColumnMappingTable';
 export { ContactPreview } from './components/ContactPreview';

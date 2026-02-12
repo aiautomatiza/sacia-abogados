@@ -43,6 +43,7 @@ export default function NewCampaign() {
     handleChannelSelect,
     handleWhatsAppNumberSelect,
     handleTemplateSelect,
+    handleVariableMappingChange,
     resetWizard,
     getContactCount,
   } = useCampaignWizard({
@@ -200,6 +201,7 @@ export default function NewCampaign() {
             onChannelSelect={handleChannelSelect}
             onWhatsAppNumberSelect={handleWhatsAppNumberSelect}
             onTemplateSelect={handleTemplateSelect}
+            onVariableMappingChange={handleVariableMappingChange}
             onLaunch={handleLaunchCampaign}
             onBack={handleBackFromLaunch}
             onNewCampaign={resetWizard}

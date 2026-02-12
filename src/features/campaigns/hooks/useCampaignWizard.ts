@@ -17,6 +17,7 @@ import type {
   ContactSourceType,
   ContactSelectionState,
   SelectedTemplate,
+  TemplateVariableMapping,
 } from '../types';
 
 interface UseCampaignWizardOptions {
@@ -44,6 +45,7 @@ const initialState: CampaignWizardState = {
   selectedWhatsAppNumberId: null,
   selectedWhatsAppWabaId: null,
   selectedTemplate: null,
+  variableMapping: [],
   validation: null,
   loading: false,
 };
@@ -367,6 +369,8 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
           // Include template info for WhatsApp campaigns
           template_id: state.selectedTemplate?.templateId,
           template_name: state.selectedTemplate?.name,
+          // Include variable mapping for WhatsApp template variables
+          variable_mapping: state.variableMapping.length > 0 ? state.variableMapping : undefined,
         },
       });
 
@@ -386,7 +390,7 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     } finally {
       setState(prev => ({ ...prev, loading: false }));
     }
-  }, [state.selectedChannel, state.selectedWhatsAppNumberId, state.selectedTemplate, getContactIdsForCampaign, onSuccess, onError]);
+  }, [state.selectedChannel, state.selectedWhatsAppNumberId, state.selectedTemplate, state.variableMapping, getContactIdsForCampaign, onSuccess, onError]);
 
   // Channel selection
   const handleChannelSelect = useCallback((channel: 'whatsapp' | 'llamadas') => {
@@ -412,7 +416,17 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
 
   // Template selection
   const handleTemplateSelect = useCallback((template: SelectedTemplate | null) => {
-    setState(prev => ({ ...prev, selectedTemplate: template }));
+    setState(prev => ({
+      ...prev,
+      selectedTemplate: template,
+      // Reset variable mapping when template changes
+      variableMapping: [],
+    }));
+  }, []);
+
+  // Variable mapping change
+  const handleVariableMappingChange = useCallback((mapping: TemplateVariableMapping[]) => {
+    setState(prev => ({ ...prev, variableMapping: mapping }));
   }, []);
 
   // Reset wizard
@@ -457,6 +471,7 @@ export function useCampaignWizard({ onSuccess, onError }: UseCampaignWizardOptio
     handleChannelSelect,
     handleWhatsAppNumberSelect,
     handleTemplateSelect,
+    handleVariableMappingChange,
     resetWizard,
     getContactCount,
   };

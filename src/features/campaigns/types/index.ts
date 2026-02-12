@@ -89,6 +89,23 @@ export interface CampaignValidation {
   contactCount: number;
 }
 
+// Template variable mapping types
+export type TemplateVariableSource =
+  | { type: 'fixed_field'; field: 'numero' | 'nombre' }
+  | { type: 'custom_field'; fieldName: string }
+  | { type: 'static_value'; value: string };
+
+export interface TemplateVariableMapping {
+  position: number;        // Position: 1, 2, 3...
+  variableName: string;    // Descriptive name (for UI)
+  source: TemplateVariableSource;
+}
+
+export interface TemplateVariable {
+  name: string;
+  position: number;
+}
+
 // WhatsApp template selection for campaigns
 export interface SelectedTemplate {
   id: string;
@@ -97,6 +114,7 @@ export interface SelectedTemplate {
   bodyText: string;
   headerText: string | null;
   footerText: string | null;
+  variables: TemplateVariable[];
 }
 
 export interface CampaignWizardState {
@@ -121,6 +139,9 @@ export interface CampaignWizardState {
 
   // Template selection (WhatsApp)
   selectedTemplate: SelectedTemplate | null;
+
+  // Template variable mapping (WhatsApp)
+  variableMapping: TemplateVariableMapping[];
 
   // Validation
   validation: CampaignValidation | null;
