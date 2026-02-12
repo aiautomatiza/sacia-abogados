@@ -14,6 +14,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizePhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,34 +134,6 @@ async function resolveContactIdentifier(
 }
 
 /**
- * Normalizes a Spanish phone number to E.164 format
- */
-function normalizeSpanishPhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-
-  if (cleaned.startsWith('+34')) {
-    return cleaned;
-  }
-
-  if (cleaned.startsWith('0034')) {
-    return '+34' + cleaned.slice(4);
-  }
-
-  if (cleaned.startsWith('34') && cleaned.length === 11) {
-    const withoutPrefix = cleaned.slice(2);
-    if (/^[6789]\d{8}$/.test(withoutPrefix)) {
-      return '+34' + withoutPrefix;
-    }
-  }
-
-  if (/^[6789]\d{8}$/.test(cleaned)) {
-    return '+34' + cleaned;
-  }
-
-  return cleaned.startsWith('+') ? cleaned : cleaned;
-}
-
-/**
  * Creates a JSON error response
  */
 function errorResponse(message: string, status: number, code?: string) {
@@ -209,14 +182,15 @@ async function lookupContactByPhone(
   tenantId: string,
   phone: string
 ): Promise<{ id: string; nombre: string | null; numero: string } | null> {
-  const normalizedPhone = normalizeSpanishPhone(phone);
-  const phoneWithoutPlus = normalizedPhone.startsWith('+') ? normalizedPhone.slice(1) : normalizedPhone;
+  const normalizedPhone = normalizePhone(phone);
+  // Also search with '+' prefix for pre-migration data compatibility
+  const phoneWithPlus = '+' + normalizedPhone;
 
   const { data, error } = await supabase
     .from('crm_contacts')
     .select('id, nombre, numero')
     .eq('tenant_id', tenantId)
-    .or(`numero.eq.${normalizedPhone},numero.eq.${phoneWithoutPlus}`)
+    .in('numero', [normalizedPhone, phoneWithPlus])
     .maybeSingle();
 
   if (error) {
@@ -367,7 +341,7 @@ async function handleCreate(supabase: SupabaseClient, payload: CreateAppointment
 
   // Normalize phone number if provided
   const callPhoneNumber = payload.call_phone_number
-    ? normalizeSpanishPhone(payload.call_phone_number)
+    ? normalizePhone(payload.call_phone_number)
     : null;
 
   // Create the appointment

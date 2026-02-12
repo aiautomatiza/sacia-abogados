@@ -7,6 +7,7 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { UserScope } from '../types/shared.types.ts';
 import { encryptCredential, ENCRYPTION_VERSION } from '../../_shared/crypto.ts';
+import { normalizePhone } from '../../_shared/phone.ts';
 
 // ============================================================================
 // TYPES
@@ -288,6 +289,11 @@ export async function updateTenantSettings(
 
   if (settings.calls_phone_number && !isValidPhoneNumber(settings.calls_phone_number)) {
     throw new Error('Número de teléfono inválido (formato E.164: +[código país][número])');
+  }
+
+  // Normalize calls_phone_number before storing
+  if (settings.calls_phone_number) {
+    settings.calls_phone_number = normalizePhone(settings.calls_phone_number);
   }
 
   if (settings.conversations_enabled && !settings.conversations_webhook_url) {

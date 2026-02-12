@@ -7,7 +7,7 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { UserScope } from '../types/shared.types.ts';
 import { ApiError } from '../types/shared.types.ts';
 import { assertTenantAccess } from '../middleware/tenant-isolation.ts';
-import { normalizeSpanishPhone } from '../utils/phone.ts';
+import { normalizePhone } from '../utils/phone.ts';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -443,7 +443,7 @@ export async function createAppointment(
 
   // Normalize phone number if provided
   const callPhoneNumber = input.call_phone_number
-    ? normalizeSpanishPhone(input.call_phone_number)
+    ? normalizePhone(input.call_phone_number)
     : null;
 
   // Create the appointment
@@ -557,7 +557,7 @@ export async function updateAppointment(
 
   if (updates.call_phone_number !== undefined) {
     updateData.call_phone_number = updates.call_phone_number
-      ? normalizeSpanishPhone(updates.call_phone_number)
+      ? normalizePhone(updates.call_phone_number)
       : null;
   }
 

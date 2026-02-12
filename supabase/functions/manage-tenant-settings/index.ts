@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifySuperAdmin, isValidUrl, isValidPhoneNumber } from '../_shared/auth.ts';
 import { storeCredential } from '../_shared/secrets.ts';
+import { normalizePhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,6 +91,11 @@ Deno.serve(async (req) => {
 
         if (settings.calls_phone_number && !isValidPhoneNumber(settings.calls_phone_number)) {
           throw new Error('Número de teléfono inválido (formato E.164: +[código país][número])');
+        }
+
+        // Normalize calls_phone_number before storing
+        if (settings.calls_phone_number) {
+          settings.calls_phone_number = normalizePhone(settings.calls_phone_number);
         }
 
         // Conversations validations

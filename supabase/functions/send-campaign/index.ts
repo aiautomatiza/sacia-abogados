@@ -14,6 +14,53 @@ function chunkArray<T>(array: T[], size: number): T[][] {
   return chunks;
 }
 
+// Type for variable mapping
+interface VariableMapping {
+  position: number;
+  variableName: string;
+  source:
+    | { type: 'fixed_field'; field: 'numero' | 'nombre' }
+    | { type: 'custom_field'; fieldName: string }
+    | { type: 'static_value'; value: string };
+}
+
+// Resolve variables for a single contact based on the mapping
+function resolveVariablesForContact(
+  contact: { numero: string; nombre: string | null; attributes: Record<string, any> },
+  variableMapping: VariableMapping[]
+): Array<{ position: number; value: string }> {
+  if (!variableMapping || variableMapping.length === 0) {
+    return [];
+  }
+
+  return variableMapping.map((mapping) => {
+    let value = '';
+
+    switch (mapping.source.type) {
+      case 'fixed_field':
+        if (mapping.source.field === 'numero') {
+          value = contact.numero || '';
+        } else if (mapping.source.field === 'nombre') {
+          value = contact.nombre || '';
+        }
+        break;
+
+      case 'custom_field':
+        value = contact.attributes?.[mapping.source.fieldName] ?? '';
+        break;
+
+      case 'static_value':
+        value = mapping.source.value || '';
+        break;
+    }
+
+    return {
+      position: mapping.position,
+      value: String(value),
+    };
+  }).sort((a, b) => a.position - b.position);
+}
+
 // Function to fetch contacts in batches
 async function fetchContactsInBatches(
   supabaseClient: any,
@@ -92,7 +139,7 @@ Deno.serve(async (req) => {
       throw new Error('No se pudo obtener el perfil del usuario');
     }
 
-    const { contact_ids, channel, phone_number_id, template_id, template_name } = await req.json();
+    const { contact_ids, channel, phone_number_id, template_id, template_name, variable_mapping } = await req.json();
 
     if (!contact_ids || !Array.isArray(contact_ids) || !channel) {
       throw new Error('Parámetros inválidos');
@@ -171,6 +218,15 @@ Deno.serve(async (req) => {
       console.warn(`⚠️ Se solicitaron ${contact_ids.length} contactos pero solo se obtuvieron ${contacts.length}`);
     }
 
+    // Resolve variables for each contact if mapping exists (WhatsApp campaigns)
+    if (channel === 'whatsapp' && variable_mapping && variable_mapping.length > 0) {
+      console.log(`Resolviendo ${variable_mapping.length} variables para ${contacts.length} contactos`);
+      contacts = contacts.map((contact) => ({
+        ...contact,
+        resolved_variables: resolveVariablesForContact(contact, variable_mapping),
+      }));
+    }
+
     // Prepare base webhook payload
     const baseWebhookPayload: any = {
       tenant_id: profile.tenant_id,
@@ -183,8 +239,9 @@ Deno.serve(async (req) => {
         phone_number_id: phone_number_id,
         template_id: template_id,
         template_name: template_name,
+        variable_mapping: variable_mapping || null,
       };
-      console.log(`WhatsApp config: phone_number_id=${phone_number_id}, template=${template_name}`);
+      console.log(`WhatsApp config: phone_number_id=${phone_number_id}, template=${template_name}, variables=${variable_mapping ? variable_mapping.length : 0}`);
     }
 
     // Add phone number for calls

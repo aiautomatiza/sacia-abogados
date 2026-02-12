@@ -144,6 +144,50 @@ async function notifyMiddleware(
 }
 
 /**
+ * Notifies external middleware about a lead label (status) change
+ * Fire-and-forget: errors are logged but don't fail the operation
+ */
+async function notifyLeadLabelMiddleware(
+  contact: { external_crm_id: string | null; numero: string },
+  labelName: string,
+  authHeader: string
+): Promise<void> {
+  const middlewareUrl = Deno.env.get('MIDDLEWARE_URL');
+
+  if (!middlewareUrl) {
+    console.warn('[contacts] Middleware URL not configured, skipping lead-label sync');
+    return;
+  }
+
+  try {
+    const payload = contact.external_crm_id
+      ? { leadId: contact.external_crm_id, labelName }
+      : { contactPhone: contact.numero, labelName };
+
+    const url = `${middlewareUrl}/api/sync/lead-label`;
+    console.log('[contacts] Notifying middleware lead-label:', url, payload);
+
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[contacts] Lead-label middleware failed: ${response.status} - ${errorText}`);
+    } else {
+      console.log('[contacts] Lead-label middleware notified successfully');
+    }
+  } catch (error) {
+    console.error('[contacts] Error notifying lead-label middleware:', error);
+  }
+}
+
+/**
  * Builds search filter for OR query on multiple columns
  */
 function buildSearchFilter(columns: string[], searchTerm: string): string {
@@ -386,7 +430,8 @@ export async function updateContact(
   supabaseClient: SupabaseClient,
   userScope: UserScope,
   id: string,
-  updates: UpdateContactInput
+  updates: UpdateContactInput,
+  authHeader: string
 ): Promise<Contact> {
   console.log('[contacts] Updating contact:', id);
 
@@ -450,10 +495,35 @@ export async function updateContact(
   // Defense in depth: validate tenant access
   assertTenantAccess(data.tenant_id, userScope, 'contact');
 
-  return {
+  const updatedContact: Contact = {
     ...data,
     attributes: (data.attributes as Record<string, any>) || {},
   };
+
+  // Notify middleware if status was changed
+  if (updates.status_id !== undefined && updates.status_id !== null) {
+    // Fetch the status name
+    const { data: statusData } = await supabaseClient
+      .from('crm_contact_statuses')
+      .select('name')
+      .eq('id', updates.status_id)
+      .single();
+
+    if (statusData?.name) {
+      const hasActiveIntegrations = await checkActiveIntegrations(supabaseClient, userScope.tenantId);
+      if (hasActiveIntegrations) {
+        notifyLeadLabelMiddleware(
+          { external_crm_id: updatedContact.external_crm_id, numero: updatedContact.numero },
+          statusData.name,
+          authHeader
+        ).catch(err => {
+          console.error('[contacts] Background lead-label notification failed:', err);
+        });
+      }
+    }
+  }
+
+  return updatedContact;
 }
 
 /**
@@ -542,15 +612,18 @@ export async function updateContactStatus(
   supabaseClient: SupabaseClient,
   userScope: UserScope,
   contactId: string,
-  statusId: string | null
+  statusId: string | null,
+  authHeader: string
 ): Promise<{ success: boolean }> {
   console.log('[contacts] Updating contact status:', { contactId, statusId });
 
-  // Validate that status exists (if not null)
+  // Validate that status exists (if not null) and get its name for middleware
+  let statusName: string | null = null;
+
   if (statusId !== null) {
     const { data: statusData, error: statusError } = await supabaseClient
       .from('crm_contact_statuses')
-      .select('id')
+      .select('id, name')
       .eq('id', statusId)
       .eq('tenant_id', userScope.tenantId)
       .eq('is_active', true)
@@ -564,6 +637,8 @@ export async function updateContactStatus(
     if (!statusData) {
       throw new ApiError('Status not found or inactive', 404, 'STATUS_NOT_FOUND');
     }
+
+    statusName = statusData.name;
   }
 
   // Update contact with new status
@@ -581,7 +656,7 @@ export async function updateContactStatus(
     query = query.eq('tenant_id', userScope.tenantId);
   }
 
-  const { data, error } = await query.select('id').single();
+  const { data, error } = await query.select('id, external_crm_id, numero').single();
 
   if (error) {
     console.error('[contacts] Error updating contact status:', error);
@@ -594,6 +669,20 @@ export async function updateContactStatus(
   }
 
   console.log('[contacts] Contact status updated successfully:', contactId);
+
+  // Notify middleware about lead label change (fire-and-forget)
+  if (statusId !== null && statusName) {
+    const hasActiveIntegrations = await checkActiveIntegrations(supabaseClient, userScope.tenantId);
+    if (hasActiveIntegrations) {
+      notifyLeadLabelMiddleware(
+        { external_crm_id: data.external_crm_id, numero: data.numero },
+        statusName,
+        authHeader
+      ).catch(err => {
+        console.error('[contacts] Background lead-label notification failed:', err);
+      });
+    }
+  }
 
   return { success: true };
 }

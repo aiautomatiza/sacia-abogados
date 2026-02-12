@@ -148,6 +148,7 @@ contactsRoutes.patch(
   async (c) => {
     const userScope = c.get('userScope') as UserScope;
     const supabaseClient = c.get('supabaseClient') as SupabaseClient;
+    const authHeader = c.req.header('Authorization') || '';
     const id = c.req.param('id');
     const updates = c.req.valid('json');
 
@@ -164,7 +165,8 @@ contactsRoutes.patch(
       supabaseClient,
       userScope,
       id,
-      updates
+      updates,
+      authHeader
     );
 
     return c.json(contact);
@@ -259,6 +261,7 @@ contactsRoutes.patch(
   async (c) => {
     const userScope = c.get('userScope') as UserScope;
     const supabaseClient = c.get('supabaseClient') as SupabaseClient;
+    const authHeader = c.req.header('Authorization') || '';
     const id = c.req.param('id');
     const { status_id } = c.req.valid('json');
 
@@ -275,7 +278,8 @@ contactsRoutes.patch(
       supabaseClient,
       userScope,
       id,
-      status_id
+      status_id,
+      authHeader
     );
 
     return c.json(result);
