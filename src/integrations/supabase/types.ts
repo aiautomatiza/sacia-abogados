@@ -425,6 +425,7 @@ export type Database = {
         Row: {
           attributes: Json | null
           created_at: string
+          external_crm_id: string | null
           id: string
           nombre: string | null
           numero: string
@@ -434,6 +435,7 @@ export type Database = {
         Insert: {
           attributes?: Json | null
           created_at?: string
+          external_crm_id?: string | null
           id?: string
           nombre?: string | null
           numero: string
@@ -443,6 +445,7 @@ export type Database = {
         Update: {
           attributes?: Json | null
           created_at?: string
+          external_crm_id?: string | null
           id?: string
           nombre?: string | null
           numero?: string

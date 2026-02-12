@@ -3,6 +3,7 @@ export interface Contact {
   tenant_id: string;
   numero: string;
   nombre: string | null;
+  external_crm_id: string | null;
   attributes: Record<string, any>;
   status_id: string | null;
   status_updated_at: string | null;

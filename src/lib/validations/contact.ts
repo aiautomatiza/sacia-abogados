@@ -30,6 +30,11 @@ export const createContactSchema = z.object({
     .uuid('Invalid status ID')
     .nullable()
     .optional(),
+  external_crm_id: z
+    .string()
+    .max(255, 'External CRM ID too long')
+    .nullable()
+    .optional(),
 }).passthrough(); // Allow custom fields to pass through
 
 /**
@@ -56,6 +61,11 @@ export const updateContactSchema = z.object({
   status_id: z
     .string()
     .uuid('Invalid status ID')
+    .nullable()
+    .optional(),
+  external_crm_id: z
+    .string()
+    .max(255, 'External CRM ID too long')
     .nullable()
     .optional(),
 }).passthrough() // Allow custom fields to pass through

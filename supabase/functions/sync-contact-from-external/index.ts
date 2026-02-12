@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizePhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,43 +16,6 @@ interface SyncContactPayload {
     nombre?: string | null;
     attributes?: Record<string, any>;
   }>;
-}
-
-/**
- * Normaliza un número de teléfono español
- * - Elimina espacios, guiones y caracteres no numéricos (excepto +)
- * - Detecta números españoles (9 dígitos empezando por 6, 7, 8 o 9)
- * - Añade prefijo +34 si es necesario
- */
-function normalizeSpanishPhone(phone: string): string {
-  // 1. Limpiar: eliminar espacios, guiones, paréntesis
-  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-
-  // 2. Si ya tiene prefijo +34, normalizar y retornar
-  if (cleaned.startsWith('+34')) {
-    return cleaned;
-  }
-
-  // 3. Si tiene prefijo 0034, convertir a +34
-  if (cleaned.startsWith('0034')) {
-    return '+34' + cleaned.slice(4);
-  }
-
-  // 4. Si tiene prefijo 34 (sin +) y el resto son 9 dígitos válidos
-  if (cleaned.startsWith('34') && cleaned.length === 11) {
-    const withoutPrefix = cleaned.slice(2);
-    if (/^[6789]\d{8}$/.test(withoutPrefix)) {
-      return '+34' + withoutPrefix;
-    }
-  }
-
-  // 5. Si es un número español de 9 dígitos (empieza por 6, 7, 8 o 9)
-  if (/^[6789]\d{8}$/.test(cleaned)) {
-    return '+34' + cleaned;
-  }
-
-  // 6. Si no coincide con patrón español, retornar limpio (puede ser internacional)
-  return cleaned.startsWith('+') ? cleaned : cleaned;
 }
 
 serve(async (req) => {
@@ -137,7 +101,7 @@ serve(async (req) => {
 
       try {
         // Normalize phone number
-        const normalizedNumero = normalizeSpanishPhone(contact.numero);
+        const normalizedNumero = normalizePhone(contact.numero);
 
         if (normalizedNumero !== contact.numero) {
           console.log(`[sync-contact-from-external] Número normalizado: ${contact.numero} -> ${normalizedNumero}`);
@@ -156,13 +120,32 @@ serve(async (req) => {
           _sync_metadata: syncMetadata,
         };
 
-        // Check if contact exists
-        const { data: existing, error: selectError } = await supabaseAdmin
-          .from('crm_contacts')
-          .select('id, attributes')
-          .eq('tenant_id', payload.tenant_id)
-          .eq('numero', normalizedNumero)
-          .maybeSingle();
+        // Check if contact exists - first by external_crm_id, then by phone number
+        let existing: { id: string; attributes: any } | null = null;
+        let selectError: any = null;
+
+        if (contact.external_id) {
+          const result = await supabaseAdmin
+            .from('crm_contacts')
+            .select('id, attributes')
+            .eq('tenant_id', payload.tenant_id)
+            .eq('external_crm_id', contact.external_id)
+            .maybeSingle();
+          existing = result.data;
+          selectError = result.error;
+        }
+
+        // Fallback: search by phone number if not found by external_crm_id
+        if (!existing && !selectError) {
+          const result = await supabaseAdmin
+            .from('crm_contacts')
+            .select('id, attributes')
+            .eq('tenant_id', payload.tenant_id)
+            .eq('numero', normalizedNumero)
+            .maybeSingle();
+          existing = result.data;
+          selectError = result.error;
+        }
 
         if (selectError) {
           console.error('[sync-contact-from-external] Error checking existing contact:', selectError);
@@ -179,12 +162,17 @@ serve(async (req) => {
             _sync_metadata: syncMetadata, // Always update sync metadata
           };
 
+          const updatePayload: Record<string, any> = {
+            nombre: contact.nombre || null,
+            attributes: mergedAttributes,
+          };
+          if (contact.external_id) {
+            updatePayload.external_crm_id = contact.external_id;
+          }
+
           const { error: updateError } = await supabaseAdmin
             .from('crm_contacts')
-            .update({
-              nombre: contact.nombre || null,
-              attributes: mergedAttributes,
-            })
+            .update(updatePayload)
             .eq('id', existing.id);
 
           if (updateError) {
@@ -203,6 +191,7 @@ serve(async (req) => {
               tenant_id: payload.tenant_id,
               numero: normalizedNumero,
               nombre: contact.nombre || null,
+              external_crm_id: contact.external_id || null,
               attributes: enrichedAttributes,
             });
 

@@ -6,7 +6,7 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { UserScope } from '../types/shared.types.ts';
 import { ApiError } from '../types/shared.types.ts';
-import { normalizeSpanishPhone } from '../utils/phone.ts';
+import { normalizePhone } from '../utils/phone.ts';
 import { assertTenantAccess } from '../middleware/tenant-isolation.ts';
 
 /**
@@ -17,6 +17,7 @@ export interface Contact {
   tenant_id: string;
   numero: string;
   nombre: string | null;
+  external_crm_id: string | null;
   attributes: Record<string, any>;
   status_id: string | null;
   status_updated_at: string | null;
@@ -39,6 +40,7 @@ export interface ContactFilters {
 export interface CreateContactInput {
   numero: string;
   nombre?: string;
+  external_crm_id?: string | null;
   attributes?: Record<string, any>;
   status_id?: string | null;
   skip_external_sync?: boolean;
@@ -290,7 +292,7 @@ export async function createContact(
   }
 
   // Normalize phone number
-  const normalizedNumero = normalizeSpanishPhone(contactData.numero);
+  const normalizedNumero = normalizePhone(contactData.numero);
 
   if (normalizedNumero !== contactData.numero) {
     console.log(`[contacts] Normalized phone: ${contactData.numero} -> ${normalizedNumero}`);
@@ -324,6 +326,7 @@ export async function createContact(
       tenant_id: userScope.tenantId,
       numero: normalizedNumero,
       nombre: contactData.nombre || null,
+      external_crm_id: contactData.external_crm_id || null,
       attributes: contactData.attributes || {},
     })
     .select()
@@ -391,11 +394,15 @@ export async function updateContact(
 
   // Normalize phone if provided
   if (updates.numero !== undefined) {
-    updateData.numero = normalizeSpanishPhone(updates.numero);
+    updateData.numero = normalizePhone(updates.numero);
   }
 
   if (updates.nombre !== undefined) {
     updateData.nombre = updates.nombre;
+  }
+
+  if (updates.external_crm_id !== undefined) {
+    updateData.external_crm_id = updates.external_crm_id;
   }
 
   if (updates.attributes !== undefined) {

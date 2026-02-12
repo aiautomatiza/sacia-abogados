@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { buildSearchFilter } from '@/lib/utils/search';
 import { getCurrentTenantId, assertTenantAccess } from '@/lib/utils/tenant';
 import { createContactSchema, updateContactSchema } from '@/lib/validations/contact';
+import { normalizePhone } from '@/lib/utils/phone';
 import type { Contact, ContactFilters } from '../types';
 import type { UserScope } from '@/features/conversations';
 
@@ -69,7 +70,7 @@ export async function createContact(contactData: Partial<Contact>): Promise<Cont
   // Validate input with Zod
   const validated = createContactSchema.parse(contactData);
 
-  const { numero, nombre, attributes, ...customFields } = validated;
+  const { numero, nombre, external_crm_id, attributes, ...customFields } = validated;
 
   // Merge existing attributes with custom fields from form
   const mergedAttributes = {
@@ -82,6 +83,7 @@ export async function createContact(contactData: Partial<Contact>): Promise<Cont
     body: {
       numero,
       nombre,
+      external_crm_id: external_crm_id || null,
       attributes: mergedAttributes,
     },
   });
@@ -112,7 +114,7 @@ export async function updateContact(
   // Validate input with Zod
   const validated = updateContactSchema.parse(contactData);
 
-  const { numero, nombre, attributes, ...customFields } = validated;
+  const { numero, nombre, external_crm_id, attributes, ...customFields } = validated;
 
   // Merge existing attributes with custom fields from form
   const mergedAttributes = {
@@ -121,8 +123,9 @@ export async function updateContact(
   };
 
   const updates: Partial<Contact> = {};
-  if (numero !== undefined) updates.numero = numero;
+  if (numero !== undefined) updates.numero = normalizePhone(numero);
   if (nombre !== undefined) updates.nombre = nombre;
+  if (external_crm_id !== undefined) updates.external_crm_id = external_crm_id || null;
   if (Object.keys(mergedAttributes).length > 0) updates.attributes = mergedAttributes;
 
   const { data, error } = await supabase

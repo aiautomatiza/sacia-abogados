@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { normalizePhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,44 +9,8 @@ const corsHeaders = {
 interface Contact {
   numero: string;
   nombre?: string;
+  external_crm_id?: string | null;
   attributes?: Record<string, any>;
-}
-
-/**
- * Normaliza un número de teléfono español
- * - Elimina espacios, guiones y caracteres no numéricos (excepto +)
- * - Detecta números españoles (9 dígitos empezando por 6, 7, 8 o 9)
- * - Añade prefijo +34 si es necesario
- */
-function normalizeSpanishPhone(phone: string): string {
-  // 1. Limpiar: eliminar espacios, guiones, paréntesis
-  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-
-  // 2. Si ya tiene prefijo +34, normalizar y retornar
-  if (cleaned.startsWith('+34')) {
-    return cleaned;
-  }
-
-  // 3. Si tiene prefijo 0034, convertir a +34
-  if (cleaned.startsWith('0034')) {
-    return '+34' + cleaned.slice(4);
-  }
-
-  // 4. Si tiene prefijo 34 (sin +) y el resto son 9 dígitos válidos
-  if (cleaned.startsWith('34') && cleaned.length === 11) {
-    const withoutPrefix = cleaned.slice(2);
-    if (/^[6789]\d{8}$/.test(withoutPrefix)) {
-      return '+34' + withoutPrefix;
-    }
-  }
-
-  // 5. Si es un número español de 9 dígitos (empieza por 6, 7, 8 o 9)
-  if (/^[6789]\d{8}$/.test(cleaned)) {
-    return '+34' + cleaned;
-  }
-
-  // 6. Si no coincide con patrón español, retornar limpio (puede ser internacional)
-  return cleaned.startsWith('+') ? cleaned : cleaned;
 }
 
 /**
@@ -133,7 +98,7 @@ Deno.serve(async (req) => {
       }
 
       // Normalizar el número antes de procesarlo
-      const normalizedNumero = normalizeSpanishPhone(contact.numero);
+      const normalizedNumero = normalizePhone(contact.numero);
       
       // Logging para debugging
       if (normalizedNumero !== contact.numero) {
@@ -160,12 +125,17 @@ Deno.serve(async (req) => {
           ...contact.attributes,
         };
 
+        const updateData: Record<string, any> = {
+          nombre: contact.nombre || null,
+          attributes: mergedAttributes,
+        };
+        if (contact.external_crm_id !== undefined) {
+          updateData.external_crm_id = contact.external_crm_id || null;
+        }
+
         const { error: updateError } = await supabaseClient
           .from('crm_contacts')
-          .update({
-            nombre: contact.nombre || null,
-            attributes: mergedAttributes,
-          })
+          .update(updateData)
           .eq('id', existing.id);
 
         if (updateError) {
@@ -182,6 +152,7 @@ Deno.serve(async (req) => {
             tenant_id: profile.tenant_id,
             numero: normalizedNumero,
             nombre: contact.nombre || null,
+            external_crm_id: contact.external_crm_id || null,
             attributes: contact.attributes || {},
           })
           .select('id')

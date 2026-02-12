@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizePhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,7 @@ const corsHeaders = {
 interface ContactData {
   numero: string;
   nombre?: string | null;
+  external_crm_id?: string | null;
   attributes?: Record<string, any>;
   skip_external_sync?: boolean; // Skip middleware notification (avoid loops)
 }
@@ -40,43 +42,6 @@ async function checkActiveIntegrations(tenantId: string): Promise<boolean> {
     console.error('[create-contact] Unexpected error checking integrations:', error);
     return false;
   }
-}
-
-/**
- * Normaliza un número de teléfono español
- * - Elimina espacios, guiones y caracteres no numéricos (excepto +)
- * - Detecta números españoles (9 dígitos empezando por 6, 7, 8 o 9)
- * - Añade prefijo +34 si es necesario
- */
-function normalizeSpanishPhone(phone: string): string {
-  // 1. Limpiar: eliminar espacios, guiones, paréntesis
-  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-
-  // 2. Si ya tiene prefijo +34, normalizar y retornar
-  if (cleaned.startsWith('+34')) {
-    return cleaned;
-  }
-
-  // 3. Si tiene prefijo 0034, convertir a +34
-  if (cleaned.startsWith('0034')) {
-    return '+34' + cleaned.slice(4);
-  }
-
-  // 4. Si tiene prefijo 34 (sin +) y el resto son 9 dígitos válidos
-  if (cleaned.startsWith('34') && cleaned.length === 11) {
-    const withoutPrefix = cleaned.slice(2);
-    if (/^[6789]\d{8}$/.test(withoutPrefix)) {
-      return '+34' + withoutPrefix;
-    }
-  }
-
-  // 5. Si es un número español de 9 dígitos (empieza por 6, 7, 8 o 9)
-  if (/^[6789]\d{8}$/.test(cleaned)) {
-    return '+34' + cleaned;
-  }
-
-  // 6. Si no coincide con patrón español, retornar limpio (puede ser internacional)
-  return cleaned.startsWith('+') ? cleaned : cleaned;
 }
 
 serve(async (req) => {
@@ -139,7 +104,7 @@ serve(async (req) => {
     console.log(`[create-contact] Creating contact for tenant ${profile.tenant_id}`);
 
     // Normalizar el número de teléfono
-    const normalizedNumero = normalizeSpanishPhone(contactData.numero);
+    const normalizedNumero = normalizePhone(contactData.numero);
 
     if (normalizedNumero !== contactData.numero) {
       console.log(`[create-contact] Número normalizado: ${contactData.numero} -> ${normalizedNumero}`);
@@ -175,6 +140,7 @@ serve(async (req) => {
         tenant_id: profile.tenant_id,
         numero: normalizedNumero,
         nombre: contactData.nombre || null,
+        external_crm_id: contactData.external_crm_id || null,
         attributes: contactData.attributes || {},
       })
       .select()
