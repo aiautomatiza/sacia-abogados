@@ -7,10 +7,14 @@
  * User scope containing authentication and tenant context
  * Used for all operations requiring user context
  */
+export type ComercialRole = 'director_comercial_general' | 'director_sede' | 'comercial';
+
 export interface UserScope {
   userId: string;
   tenantId: string;
   isSuperAdmin: boolean;
+  comercialRole: ComercialRole | null;
+  locationId: string | null;
 }
 
 /**

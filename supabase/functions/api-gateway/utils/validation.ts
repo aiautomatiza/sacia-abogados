@@ -414,3 +414,4 @@ export const checkAvailabilitySchema = z.object({
   location_id: z.string().uuid().optional(),
   exclude_appointment_id: z.string().uuid().optional(),
 });
+

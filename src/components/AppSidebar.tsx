@@ -1,10 +1,11 @@
 import {
   Users, Settings, LogOut,
-  ChevronLeft, ChevronRight, Send, MessageSquare, Phone, CalendarDays
+  ChevronLeft, ChevronRight, Send, MessageSquare, Phone, CalendarDays, UserCog
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
+import { useComercialRole } from '@/hooks/useComercialRole';
 import { useModuleAccess } from '@/hooks/useTenantSettings';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -49,6 +50,7 @@ const navigationItems: NavigationItem[] = [
     group: 'Principal',
     roles: ['user_client', 'super_admin'],
     requiredModule: 'campaigns',
+    hiddenForComercialRoles: ['director_sede', 'comercial'],
   },
   {
     title: 'Llamadas',
@@ -67,17 +69,27 @@ const navigationItems: NavigationItem[] = [
     requiredModule: 'appointments',
   },
   {
+    title: 'Equipo Comercial',
+    url: '/comerciales',
+    icon: UserCog,
+    group: 'Principal',
+    roles: ['user_client', 'super_admin'],
+    visibleForComercialRoles: [null, 'director_comercial_general', 'director_sede'],
+  },
+  {
     title: 'Configuración',
     url: '/contacts/settings',
     icon: Settings,
     group: 'Configuración',
     roles: ['user_client', 'super_admin'],
+    visibleForComercialRoles: [null, 'director_comercial_general'],
   },
 ];
 
 export function AppSidebar() {
   const { signOut } = useAuth();
   const { role } = useRole();
+  const { comercialRole } = useComercialRole();
   const { isLoading: loadingModules, isModuleEnabled } = useModuleAccess();
   const navigate = useNavigate();
   const { state, toggleSidebar } = useSidebar();
@@ -89,10 +101,20 @@ export function AppSidebar() {
     navigate('/auth');
   };
 
-  // Filtrar items según el rol del usuario y módulos habilitados del tenant
+  // Filtrar items según el rol del usuario, módulos habilitados y rol comercial
   const filteredNavigationItems = navigationItems.filter((item) => {
     // Filtrar por rol
     if (item.roles && role && !item.roles.includes(role)) {
+      return false;
+    }
+
+    // Filtrar por rol comercial - hidden
+    if (item.hiddenForComercialRoles && comercialRole && item.hiddenForComercialRoles.includes(comercialRole)) {
+      return false;
+    }
+
+    // Filtrar por rol comercial - visible only for specific roles
+    if (item.visibleForComercialRoles && !item.visibleForComercialRoles.includes(comercialRole)) {
       return false;
     }
 

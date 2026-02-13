@@ -6,6 +6,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { callsRepo } from "../lib/repos/calls.repo";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/auth-context";
 import type { CallFilters, CallSortConfig } from "../types/call.types";
 
 export const CALLS_QUERY_KEY = "calls";
@@ -29,11 +30,12 @@ export function useCallsData({
 }: UseCallsDataOptions) {
   const queryClient = useQueryClient();
   const { tenantId } = useProfile();
+  const { scope } = useAuth();
 
   // Main query for calls list with tenant isolation
   const callsQuery = useQuery({
-    queryKey: [CALLS_QUERY_KEY, tenantId, filters, page, pageSize, sort],
-    queryFn: () => callsRepo.listCalls(filters, page, pageSize, sort),
+    queryKey: [CALLS_QUERY_KEY, tenantId, scope?.comercialRole, filters, page, pageSize, sort],
+    queryFn: () => callsRepo.listCalls(filters, page, pageSize, sort, scope ?? undefined),
     enabled: enabled && !!tenantId,
     staleTime: 30000, // 30 seconds
     placeholderData: (previousData) => previousData,
@@ -41,8 +43,8 @@ export function useCallsData({
 
   // Separate query for stats (doesn't depend on pagination)
   const statsQuery = useQuery({
-    queryKey: [CALLS_STATS_QUERY_KEY, tenantId, filters],
-    queryFn: () => callsRepo.getCallStats(filters),
+    queryKey: [CALLS_STATS_QUERY_KEY, tenantId, scope?.comercialRole, filters],
+    queryFn: () => callsRepo.getCallStats(filters, scope ?? undefined),
     enabled: enabled && !!tenantId,
     staleTime: 60000, // 1 minute
   });

@@ -29,6 +29,8 @@ import TenantSettings from "./pages/admin/TenantSettings";
 import TenantCustomFields from "./pages/admin/TenantCustomFields";
 import Integrations from "./pages/Integrations";
 import OAuthCallback from "./pages/OAuthCallback";
+import Comerciales from "./pages/Comerciales";
+import { ComercialRoute } from "./components/ComercialRoute";
 
 // Setup global error handlers on app initialization
 setupGlobalErrorHandlers();
@@ -88,20 +90,30 @@ const App = () => (
                 </ModuleRoute>
               } />
               <Route path="/contacts" element={<Contacts />} />
-              <Route path="/contacts/settings" element={<ContactSettings />} />
+              <Route path="/contacts/settings" element={
+                <ComercialRoute allowedRoles={[null, 'director_comercial_general']}>
+                  <ContactSettings />
+                </ComercialRoute>
+              } />
               <Route path="/campaigns" element={
                 <ModuleRoute module="campaigns">
-                  <Campaigns />
+                  <ComercialRoute blockedRoles={['director_sede', 'comercial']}>
+                    <Campaigns />
+                  </ComercialRoute>
                 </ModuleRoute>
               } />
               <Route path="/campaigns/new" element={
                 <ModuleRoute module="campaigns">
-                  <NewCampaign />
+                  <ComercialRoute blockedRoles={['director_sede', 'comercial']}>
+                    <NewCampaign />
+                  </ComercialRoute>
                 </ModuleRoute>
               } />
               <Route path="/campaigns/:id" element={
                 <ModuleRoute module="campaigns">
-                  <CampaignDetail />
+                  <ComercialRoute blockedRoles={['director_sede', 'comercial']}>
+                    <CampaignDetail />
+                  </ComercialRoute>
                 </ModuleRoute>
               } />
               <Route path="/calls" element={
@@ -113,6 +125,11 @@ const App = () => (
                 <ModuleRoute module="appointments">
                   <Appointments />
                 </ModuleRoute>
+              } />
+              <Route path="/comerciales" element={
+                <ComercialRoute allowedRoles={[null, 'director_comercial_general', 'director_sede']}>
+                  <Comerciales />
+                </ComercialRoute>
               } />
             </Route>
             

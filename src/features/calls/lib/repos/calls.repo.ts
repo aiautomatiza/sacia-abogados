@@ -4,6 +4,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { getSedeAgentIds } from "@/lib/utils/comercial-filters";
+import type { UserScope } from "@/features/conversations";
 import type {
   CallDetailed,
   CallFilters,
@@ -23,7 +25,8 @@ export async function listCalls(
   filters: CallFilters = {},
   page: number = 1,
   pageSize: number = DEFAULT_PAGE_SIZE,
-  sort: CallSortConfig = { sortBy: "call_datetime", sortOrder: "desc" }
+  sort: CallSortConfig = { sortBy: "call_datetime", sortOrder: "desc" },
+  scope?: UserScope
 ): Promise<CallsListResponse> {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -31,6 +34,18 @@ export async function listCalls(
   let query = supabase
     .from("v_crm_calls_detailed")
     .select("*", { count: "exact" });
+
+  // Apply comercial role-based filtering
+  if (scope?.comercialRole === 'comercial') {
+    query = query.eq("agent_id", scope.userId);
+  } else if (scope?.comercialRole === 'director_sede' && scope.locationId) {
+    const sedeAgentIds = await getSedeAgentIds(scope.tenantId, scope.locationId);
+    if (sedeAgentIds.length > 0) {
+      query = query.in("agent_id", sedeAgentIds);
+    } else {
+      return { data: [], count: 0 };
+    }
+  }
 
   // Apply search filter (contact name or phone)
   if (filters.search) {
@@ -98,8 +113,11 @@ export async function getCallById(id: string): Promise<CallDetailed | null> {
 
 /**
  * Get call statistics using the database function
+ * Note: For comercial/director_sede, stats are filtered client-side via the view
+ * since the RPC doesn't support agent_id filtering natively.
+ * For accurate stats, we fall back to a manual count when comercial filtering is needed.
  */
-export async function getCallStats(filters: CallFilters = {}): Promise<CallStats> {
+export async function getCallStats(filters: CallFilters = {}, scope?: UserScope): Promise<CallStats> {
   const params: {
     p_tenant_id?: string;
     p_date_from?: string;

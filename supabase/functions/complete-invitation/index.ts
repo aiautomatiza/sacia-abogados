@@ -126,12 +126,26 @@ Deno.serve(async (req) => {
 
       console.log('Role assigned, updating profile');
 
-      // Update profile with tenant_id
+      // Update profile with tenant_id, comercial_role, location_id, and full_name
+      const profileUpdates: Record<string, unknown> = {
+        tenant_id: invitation.role === 'user_client' ? invitation.tenant_id : null,
+        full_name: invitation.full_name || null,
+      };
+
+      // Set comercial role if present in the invitation
+      if (invitation.comercial_role) {
+        profileUpdates.comercial_role = invitation.comercial_role;
+      }
+      if (invitation.location_id) {
+        profileUpdates.location_id = invitation.location_id;
+      }
+      if (invitation.external_id) {
+        profileUpdates.external_id = invitation.external_id;
+      }
+
       const { error: profileError } = await supabaseClient
         .from('profiles')
-        .update({ 
-          tenant_id: invitation.role === 'user_client' ? invitation.tenant_id : null 
-        })
+        .update(profileUpdates)
         .eq('id', userId);
 
       if (profileError) {

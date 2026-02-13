@@ -36,6 +36,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'user_client' | 'super_admin'>('user_client');
   const [tenantId, setTenantId] = useState<string>('');
+  const [comercialRole, setComercialRole] = useState<string>('');
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingTenants, setLoadingTenants] = useState(false);
@@ -86,6 +87,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
           full_name: fullName,
           role,
           tenant_id: role === 'user_client' ? tenantId : null,
+          comercial_role: role === 'user_client' && comercialRole ? comercialRole : null,
         },
       });
 
@@ -100,6 +102,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
       setFullName('');
       setRole('user_client');
       setTenantId('');
+      setComercialRole('');
       
       onSuccess();
       onOpenChange(false);
@@ -190,6 +193,23 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
                         {tenant.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {role === 'user_client' && (
+              <div className="grid gap-2">
+                <Label>Rol Comercial (opcional)</Label>
+                <Select value={comercialRole} onValueChange={setComercialRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin rol comercial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin rol comercial</SelectItem>
+                    <SelectItem value="director_comercial_general">Director Comercial General</SelectItem>
+                    <SelectItem value="director_sede">Director de Sede</SelectItem>
+                    <SelectItem value="comercial">Comercial</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -9,7 +9,10 @@ import { useProfile } from "@/hooks/useProfile";
 export interface TenantAgent {
   id: string;
   email: string;
+  full_name: string | null;
   tenant_id: string | null;
+  comercial_role: string | null;
+  location_id: string | null;
 }
 
 // ============================================================================
@@ -25,7 +28,7 @@ export const TENANT_AGENTS_QUERY_KEY = "tenant-agents";
 async function fetchTenantAgents(tenantId: string): Promise<TenantAgent[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, tenant_id")
+    .select("id, email, full_name, tenant_id, comercial_role, location_id")
     .eq("tenant_id", tenantId)
     .order("email", { ascending: true });
 

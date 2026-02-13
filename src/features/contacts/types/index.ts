@@ -8,6 +8,8 @@ export interface Contact {
   status_id: string | null;
   status_updated_at: string | null;
   status_updated_by: string | null;
+  assigned_to: string | null;
+  location_id: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,4 +1,5 @@
 import type { Database } from "@/integrations/supabase/types";
+import type { ComercialRole } from "@/types/comercial";
 
 // Database types
 export type ConversationChannel = Database["public"]["Enums"]["conversation_channel"];
@@ -151,6 +152,8 @@ export interface UserScope {
   userId: string;
   tenantId: string;
   isSuperAdmin: boolean;
+  comercialRole: ComercialRole | null;
+  locationId: string | null;
 }
 
 // WhatsApp window status

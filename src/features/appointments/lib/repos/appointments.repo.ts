@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getSedeAgentIds } from "@/lib/utils/comercial-filters";
+import type { UserScope } from "@/features/conversations";
 import type {
   AppointmentDetailed,
   AppointmentFilters,
@@ -45,11 +47,24 @@ export async function listAppointments(
   filters: AppointmentFilters = {},
   page: number = 1,
   pageSize: number = DEFAULT_PAGE_SIZE,
-  sort: AppointmentSortConfig = { sortBy: "scheduled_at", sortOrder: "desc" }
+  sort: AppointmentSortConfig = { sortBy: "scheduled_at", sortOrder: "desc" },
+  scope?: UserScope
 ): Promise<AppointmentsListResponse> {
   let query = supabase
     .from("v_appointments_detailed")
     .select("*", { count: "exact" });
+
+  // Apply comercial role-based filtering
+  if (scope?.comercialRole === 'comercial') {
+    query = query.eq("agent_id", scope.userId);
+  } else if (scope?.comercialRole === 'director_sede' && scope.locationId) {
+    const sedeAgentIds = await getSedeAgentIds(scope.tenantId, scope.locationId);
+    if (sedeAgentIds.length > 0) {
+      query = query.or(`location_id.eq.${scope.locationId},agent_id.in.(${sedeAgentIds.join(',')})`);
+    } else {
+      query = query.eq("location_id", scope.locationId);
+    }
+  }
 
   // Filtros
   if (filters.search) {
@@ -113,8 +128,25 @@ export async function listAppointments(
 // ============================================================================
 
 export async function getAppointmentTabCounts(
-  baseFilters: Omit<AppointmentFilters, "assignment_tab"> = {}
+  baseFilters: Omit<AppointmentFilters, "assignment_tab"> = {},
+  scope?: UserScope
 ): Promise<AppointmentTabCounts> {
+  // Helper to apply comercial role-based filtering
+  const applyComercialFilter = async (q: ReturnType<typeof supabase.from>) => {
+    let query = q;
+    if (scope?.comercialRole === 'comercial') {
+      query = query.eq("agent_id", scope.userId);
+    } else if (scope?.comercialRole === 'director_sede' && scope.locationId) {
+      const sedeAgentIds = await getSedeAgentIds(scope.tenantId, scope.locationId);
+      if (sedeAgentIds.length > 0) {
+        query = query.or(`location_id.eq.${scope.locationId},agent_id.in.(${sedeAgentIds.join(',')})`);
+      } else {
+        query = query.eq("location_id", scope.locationId);
+      }
+    }
+    return query;
+  };
+
   // Helper para aplicar filtros base
   const applyBaseFilters = (q: ReturnType<typeof supabase.from>) => {
     let query = q;
@@ -155,12 +187,32 @@ export async function getAppointmentTabCounts(
     return query;
   };
 
+  // For comercial role, pending tab (agent_id IS NULL) would always be 0
+  // since they can only see their own appointments
+  if (scope?.comercialRole === 'comercial') {
+    // Comercial only sees assigned-to-them appointments, never unassigned
+    let assignedQuery = supabase
+      .from("v_appointments_detailed")
+      .select("*", { count: "exact", head: true })
+      .eq("agent_id", scope.userId);
+    assignedQuery = applyBaseFilters(assignedQuery);
+
+    const assignedResult = await assignedQuery;
+    if (assignedResult.error) throw assignedResult.error;
+
+    return {
+      pending_assignment: 0,
+      assigned: assignedResult.count || 0,
+    };
+  }
+
   // Query pendientes: type='call' AND agent_id IS NULL
   let pendingQuery = supabase
     .from("v_appointments_detailed")
     .select("*", { count: "exact", head: true })
     .eq("type", "call")
     .is("agent_id", null);
+  pendingQuery = await applyComercialFilter(pendingQuery);
   pendingQuery = applyBaseFilters(pendingQuery);
 
   // Query asignadas: type='in_person' OR (type='call' AND agent_id IS NOT NULL)
@@ -168,6 +220,7 @@ export async function getAppointmentTabCounts(
     .from("v_appointments_detailed")
     .select("*", { count: "exact", head: true })
     .or("type.eq.in_person,and(type.eq.call,agent_id.not.is.null)");
+  assignedQuery = await applyComercialFilter(assignedQuery);
   assignedQuery = applyBaseFilters(assignedQuery);
 
   const [pendingResult, assignedResult] = await Promise.all([
@@ -206,15 +259,25 @@ export async function getAppointmentById(
 // ============================================================================
 
 export async function getAppointmentStats(
-  filters: AppointmentFilters = {}
+  filters: AppointmentFilters = {},
+  scope?: UserScope
 ): Promise<AppointmentStats> {
+  // For comercial role, force agent_id filter
+  let agentIdFilter = filters.agent_id ?? null;
+  let locationIdFilter = filters.location_id ?? null;
+  if (scope?.comercialRole === 'comercial') {
+    agentIdFilter = scope.userId;
+  } else if (scope?.comercialRole === 'director_sede' && scope.locationId) {
+    locationIdFilter = locationIdFilter ?? scope.locationId;
+  }
+
   const { data, error } = await supabase.rpc("calculate_appointments_stats", {
     p_tenant_id: null, // Se obtiene automaticamente del usuario
     p_date_from: filters.date_from?.toISOString() ?? null,
     p_date_to: filters.date_to?.toISOString() ?? null,
     p_type: filters.types?.[0] ?? null,
-    p_location_id: filters.location_id ?? null,
-    p_agent_id: filters.agent_id ?? null,
+    p_location_id: locationIdFilter,
+    p_agent_id: agentIdFilter,
   });
 
   if (error) throw error;
@@ -252,9 +315,34 @@ export async function createAppointment(
   } = await supabase.auth.getUser();
 
   // Validar segun tipo
-  // Nota: agent_id es opcional para citas de llamada (se puede asignar despues)
   if (input.type === "in_person" && !input.location_id) {
     throw new Error("Las citas presenciales requieren una sede asignada");
+  }
+
+  let agentId = input.type === "call" ? (input.agent_id ?? null) : null;
+  let locationId = input.type === "in_person" ? (input.location_id ?? null) : null;
+
+  // For call appointments without explicit agent, auto-assign from contact's assigned comercial
+  if (input.type === "call" && !agentId) {
+    const { data: contact } = await supabase
+      .from("crm_contacts")
+      .select("assigned_to")
+      .eq("id", input.contact_id)
+      .single();
+
+    if (contact?.assigned_to) {
+      agentId = contact.assigned_to;
+      // Also get the comercial's location
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("location_id")
+        .eq("id", contact.assigned_to)
+        .single();
+
+      if (profile?.location_id) {
+        locationId = profile.location_id;
+      }
+    }
   }
 
   const { data, error } = await supabase
@@ -269,8 +357,8 @@ export async function createAppointment(
       title: input.title ?? null,
       description: input.description ?? null,
       customer_notes: input.customer_notes ?? null,
-      agent_id: input.type === "call" ? input.agent_id : null,
-      location_id: input.type === "in_person" ? input.location_id : null,
+      agent_id: agentId,
+      location_id: locationId,
       call_phone_number: input.type === "call" ? input.call_phone_number : null,
     })
     .select()

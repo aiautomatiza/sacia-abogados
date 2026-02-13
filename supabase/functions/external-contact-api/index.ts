@@ -45,6 +45,12 @@ interface UpdateAttributesRequest {
   attributes: Record<string, any>;
 }
 
+interface AssignComercialRequest {
+  tenant_id: string;
+  contact_id: string;
+  external_id: string;
+}
+
 interface ValidationError {
   field: string;
   message: string;
@@ -591,6 +597,118 @@ async function handleUpdateAttributes(
   });
 }
 
+/**
+ * Handles the /assign-comercial endpoint
+ * Assigns a comercial to a contact using the comercial's external_id
+ */
+async function handleAssignComercial(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  payload: AssignComercialRequest
+): Promise<Response> {
+  console.log('[external-contact-api/assign-comercial] Processing assign request');
+
+  // Validate required fields
+  if (!payload.tenant_id) {
+    return errorResponse('Missing required field: tenant_id', 400);
+  }
+
+  if (!payload.contact_id) {
+    return errorResponse('Missing required field: contact_id', 400);
+  }
+
+  if (!payload.external_id) {
+    return errorResponse('Missing required field: external_id', 400);
+  }
+
+  // Step 1: Verify tenant exists
+  const { data: tenant, error: tenantError } = await supabaseAdmin
+    .from('tenants')
+    .select('id')
+    .eq('id', payload.tenant_id)
+    .maybeSingle();
+
+  if (tenantError) {
+    console.error('[external-contact-api/assign-comercial] Error checking tenant:', tenantError);
+    return errorResponse('Database error', 500);
+  }
+
+  if (!tenant) {
+    return errorResponse('Tenant not found', 404);
+  }
+
+  // Step 2: Look up comercial by external_id within the tenant
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, full_name, comercial_role, location_id')
+    .eq('external_id', payload.external_id)
+    .eq('tenant_id', payload.tenant_id)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error('[external-contact-api/assign-comercial] Error looking up comercial:', profileError);
+    return errorResponse('Database error', 500);
+  }
+
+  if (!profile) {
+    return errorResponse(`Comercial with external_id "${payload.external_id}" not found in tenant`, 404);
+  }
+
+  // Step 3: Verify contact exists and belongs to tenant
+  const { data: contact, error: contactError } = await supabaseAdmin
+    .from('crm_contacts')
+    .select('id, nombre, numero')
+    .eq('id', payload.contact_id)
+    .eq('tenant_id', payload.tenant_id)
+    .maybeSingle();
+
+  if (contactError) {
+    console.error('[external-contact-api/assign-comercial] Error checking contact:', contactError);
+    return errorResponse('Database error', 500);
+  }
+
+  if (!contact) {
+    return errorResponse('Contact not found or does not belong to tenant', 404);
+  }
+
+  // Step 4: Assign comercial to contact
+  const updates: Record<string, unknown> = {
+    assigned_to: profile.id,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Also copy the comercial's location_id to the contact if present
+  if (profile.location_id) {
+    updates.location_id = profile.location_id;
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('crm_contacts')
+    .update(updates)
+    .eq('id', payload.contact_id);
+
+  if (updateError) {
+    console.error('[external-contact-api/assign-comercial] Error assigning comercial:', updateError);
+    return errorResponse('Error assigning comercial to contact', 500);
+  }
+
+  console.log(`[external-contact-api/assign-comercial] Contact ${payload.contact_id} assigned to comercial ${profile.id} (external_id: ${payload.external_id})`);
+
+  return successResponse({
+    contact: {
+      id: contact.id,
+      nombre: contact.nombre,
+      numero: contact.numero,
+    },
+    comercial: {
+      id: profile.id,
+      full_name: profile.full_name,
+      external_id: payload.external_id,
+      comercial_role: profile.comercial_role,
+      location_id: profile.location_id,
+    },
+  });
+}
+
 // ============================================================================
 // Main Handler
 // ============================================================================
@@ -658,8 +776,11 @@ serve(async (req) => {
       case 'update-attributes':
         return await handleUpdateAttributes(supabaseAdmin, payload as UpdateAttributesRequest);
 
+      case 'assign-comercial':
+        return await handleAssignComercial(supabaseAdmin, payload as AssignComercialRequest);
+
       default:
-        return errorResponse(`Unknown action: ${action}. Valid actions: lookup, update-status, update-attributes`, 400);
+        return errorResponse(`Unknown action: ${action}. Valid actions: lookup, update-status, update-attributes, assign-comercial`, 400);
     }
   } catch (error) {
     console.error('[external-contact-api] Unexpected error:', error);

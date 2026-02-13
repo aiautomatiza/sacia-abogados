@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/auth-context";
 import { appointmentsRepo } from "../lib/repos/appointments.repo";
 import type {
   AppointmentFilters,
@@ -65,12 +66,13 @@ export function useAppointmentsData({
 }: UseAppointmentsDataOptions) {
   const { profile } = useProfile();
   const tenantId = profile?.tenant_id;
+  const { scope } = useAuth();
   const queryClient = useQueryClient();
 
   // Query 1: Datos paginados
   const appointmentsQuery = useQuery({
     queryKey: appointmentsQueryKeys.list(tenantId ?? "", filters, page, pageSize, sort),
-    queryFn: () => appointmentsRepo.listAppointments(filters, page, pageSize, sort),
+    queryFn: () => appointmentsRepo.listAppointments(filters, page, pageSize, sort, scope ?? undefined),
     enabled: enabled && !!tenantId,
     staleTime: 30000, // 30 segundos
     placeholderData: (previousData) => previousData,
@@ -79,7 +81,7 @@ export function useAppointmentsData({
   // Query 2: Estadisticas (independiente, cache mas largo)
   const statsQuery = useQuery({
     queryKey: appointmentsQueryKeys.stats(tenantId ?? "", filters),
-    queryFn: () => appointmentsRepo.getAppointmentStats(filters),
+    queryFn: () => appointmentsRepo.getAppointmentStats(filters, scope ?? undefined),
     enabled: enabled && !!tenantId,
     staleTime: 60000, // 1 minuto
   });
@@ -211,10 +213,11 @@ export function useAppointmentTabCounts(
 ) {
   const { profile } = useProfile();
   const tenantId = profile?.tenant_id;
+  const { scope } = useAuth();
 
   return useQuery({
     queryKey: appointmentsQueryKeys.tabCounts(tenantId ?? "", baseFilters),
-    queryFn: () => appointmentsRepo.getAppointmentTabCounts(baseFilters),
+    queryFn: () => appointmentsRepo.getAppointmentTabCounts(baseFilters, scope ?? undefined),
     enabled: enabled && !!tenantId,
     staleTime: 30000, // 30 segundos
   });

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon, Phone, MapPin, Search, User, X } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 import { useContacts } from "@/features/contacts/hooks/useContacts";
 import {
   Dialog,
@@ -105,6 +106,7 @@ export function AppointmentFormDialog({
   preSelectedContactName,
   preSelectedContactPhone,
 }: AppointmentFormDialogProps) {
+  const { scope } = useAuth();
   const { data: locations } = useActiveLocations();
   const { agents } = useTenantAgents();
   const { createMutation, updateMutation } = useAppointmentMutations();
@@ -113,6 +115,19 @@ export function AppointmentFormDialog({
   );
 
   const isEditing = !!appointment;
+
+  // Filter assignable agents based on caller's comercial role
+  const isComercial = scope?.comercialRole === 'comercial';
+  const assignableAgents = useMemo(() => {
+    if (!agents) return [];
+    if (scope?.comercialRole === 'comercial') {
+      return agents.filter(a => a.id === scope.userId);
+    }
+    if (scope?.comercialRole === 'director_sede' && scope.locationId) {
+      return agents.filter(a => a.location_id === scope.locationId);
+    }
+    return agents;
+  }, [agents, scope]);
 
   // Contact search state
   const [contactSearch, setContactSearch] = useState("");
@@ -212,6 +227,13 @@ export function AppointmentFormDialog({
       setContactSearch("");
     }
   }, [appointment, preSelectedContactId, preSelectedContactName, preSelectedContactPhone, form]);
+
+  // Auto-assign agent for comercial users
+  useEffect(() => {
+    if (isComercial && scope?.userId && !isEditing) {
+      form.setValue('agent_id', scope.userId);
+    }
+  }, [isComercial, scope?.userId, isEditing, form]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -561,26 +583,41 @@ export function AppointmentFormDialog({
                       <FormLabel>
                         Comercial <span className="text-destructive">*</span>
                       </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona comercial" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {agents?.map((agent) => (
-                            <SelectItem key={agent.id} value={agent.id}>
-                              {agent.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        El comercial que realizara la llamada
-                      </FormDescription>
+                      {isComercial ? (
+                        <>
+                          <div className="flex items-center gap-2 p-3 bg-muted rounded-md text-sm">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span>{assignableAgents[0]?.full_name || assignableAgents[0]?.email || 'Tu'}</span>
+                            <span className="text-muted-foreground ml-auto text-xs">Autoasignado</span>
+                          </div>
+                          <FormDescription>
+                            Las citas se asignan automaticamente a ti
+                          </FormDescription>
+                        </>
+                      ) : (
+                        <>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona comercial" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {assignableAgents.map((agent) => (
+                                <SelectItem key={agent.id} value={agent.id}>
+                                  {agent.full_name || agent.email}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            El comercial que realizara la llamada
+                          </FormDescription>
+                        </>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}

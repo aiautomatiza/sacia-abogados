@@ -32,6 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId: user.id,
       tenantId: profile.tenant_id,
       isSuperAdmin: isSuperAdmin,
+      comercialRole: profile.comercial_role ?? null,
+      locationId: profile.location_id ?? null,
     };
   }, [user, profile, isSuperAdmin]);
 

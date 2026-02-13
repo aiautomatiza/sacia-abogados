@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { email, full_name, role, tenant_id } = await req.json();
+    const { email, full_name, role, tenant_id, comercial_role, location_id, external_id } = await req.json();
 
     // Validations
     if (!email || !full_name || !role) {
@@ -94,7 +94,12 @@ Deno.serve(async (req) => {
       throw new Error('Ya existe una invitación pendiente para este email');
     }
 
-    console.log('Creating invitation for:', { email, full_name, role, tenant_id });
+    // Validate external_id is required when comercial_role is set
+    if (comercial_role && !external_id) {
+      throw new Error('external_id es obligatorio para usuarios con rol comercial');
+    }
+
+    console.log('Creating invitation for:', { email, full_name, role, tenant_id, comercial_role, location_id, external_id });
 
     // Create invitation record
     const { data: invitation, error: invitationError } = await adminClient
@@ -102,6 +107,9 @@ Deno.serve(async (req) => {
       .insert({
         email,
         full_name,
+        comercial_role: comercial_role || null,
+        location_id: location_id || null,
+        external_id: external_id || null,
         role,
         tenant_id: role === 'user_client' ? tenant_id : null,
         invited_by: user.id

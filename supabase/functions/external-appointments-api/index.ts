@@ -286,12 +286,41 @@ async function handleCreate(supabase: SupabaseClient, payload: CreateAppointment
   const contactId = contact.id;
   console.log(`[external-appointments-api/create] Resolved contact: ${contactId} (from: ${contactIdentifier})`)
 
+  // For call appointments: auto-resolve agent from contact's assigned comercial if not provided
+  let resolvedAgentId = payload.agent_id || null;
+  let resolvedLocationId = payload.location_id || null;
+
+  if (payload.type === 'call' && !resolvedAgentId) {
+    const { data: contactData } = await supabase
+      .from('crm_contacts')
+      .select('assigned_to')
+      .eq('id', contactId)
+      .single();
+
+    if (contactData?.assigned_to) {
+      resolvedAgentId = contactData.assigned_to;
+      console.log(`[external-appointments-api/create] Auto-assigned agent from contact: ${resolvedAgentId}`);
+
+      // Also get the comercial's location
+      const { data: agentProfile } = await supabase
+        .from('profiles')
+        .select('location_id')
+        .eq('id', contactData.assigned_to)
+        .single();
+
+      if (agentProfile?.location_id) {
+        resolvedLocationId = agentProfile.location_id;
+        console.log(`[external-appointments-api/create] Auto-assigned location from agent: ${resolvedLocationId}`);
+      }
+    }
+  }
+
   // Verify agent exists (for call type)
-  if (payload.type === 'call' && payload.agent_id) {
+  if (payload.type === 'call' && resolvedAgentId) {
     const { data: agent, error: agentError } = await supabase
       .from('profiles')
       .select('id')
-      .eq('id', payload.agent_id)
+      .eq('id', resolvedAgentId)
       .maybeSingle();
 
     if (agentError || !agent) {
@@ -324,8 +353,8 @@ async function handleCreate(supabase: SupabaseClient, payload: CreateAppointment
       p_type: payload.type,
       p_scheduled_at: payload.scheduled_at,
       p_duration_minutes: payload.duration_minutes || 30,
-      p_agent_id: payload.agent_id || null,
-      p_location_id: payload.location_id || null,
+      p_agent_id: resolvedAgentId,
+      p_location_id: resolvedLocationId,
       p_exclude_appointment_id: null,
     });
 
@@ -351,8 +380,8 @@ async function handleCreate(supabase: SupabaseClient, payload: CreateAppointment
       tenant_id: payload.tenant_id,
       type: payload.type,
       contact_id: contactId,
-      agent_id: payload.agent_id || null,
-      location_id: payload.location_id || null,
+      agent_id: resolvedAgentId,
+      location_id: resolvedLocationId,
       scheduled_at: payload.scheduled_at,
       duration_minutes: payload.duration_minutes || 30,
       timezone: payload.timezone || 'Europe/Madrid',

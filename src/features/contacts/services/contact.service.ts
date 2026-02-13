@@ -3,19 +3,26 @@ import { buildSearchFilter } from '@/lib/utils/search';
 import { getCurrentTenantId, assertTenantAccess } from '@/lib/utils/tenant';
 import { createContactSchema, updateContactSchema } from '@/lib/validations/contact';
 import { normalizePhone } from '@/lib/utils/phone';
+import { applyContactVisibilityFilter } from '@/lib/utils/comercial-filters';
 import type { Contact, ContactFilters } from '../types';
 import type { UserScope } from '@/features/conversations';
 
 export async function getContacts(
   filters: ContactFilters = {},
   page: number = 1,
-  pageSize: number = 30
+  pageSize: number = 30,
+  scope?: UserScope
 ): Promise<{ data: Contact[]; total: number }> {
   // Tenant isolation enforced at query level
   // RLS policies provide additional security at database level
   let query = supabase
     .from('crm_contacts')
     .select('*', { count: 'exact' });
+
+  // Apply comercial role-based visibility filter
+  if (scope) {
+    query = applyContactVisibilityFilter(query, scope);
+  }
 
   if (filters.search) {
     const searchFilter = buildSearchFilter(['numero', 'nombre'], filters.search);

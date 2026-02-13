@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchTerm } from "@/lib/utils/search";
 import { assertTenantAccess } from "@/lib/utils/tenant";
+import { getVisibleContactIdsForScope } from "@/lib/utils/comercial-filters";
 import {
   sendMessageSchema,
   createConversationSchema,
@@ -48,6 +49,20 @@ export const listConversations = async ({
 }): Promise<ConversationsResponse> => {
   const offset = (page - 1) * pageSize;
   const hasSearch = filters.search && filters.search.trim().length > 0;
+
+  // Comercial role filtering: pre-fetch visible contact IDs
+  const visibleContactIds = await getVisibleContactIdsForScope(scope);
+
+  // If comercial filtering returned an empty array, no contacts are visible
+  if (visibleContactIds !== null && visibleContactIds.length === 0) {
+    return {
+      conversations: [],
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 0,
+    };
+  }
 
   // Si hay búsqueda, primero obtenemos los IDs de contactos que coinciden
   // TIER S: Limitamos la búsqueda a 200 contactos para evitar queries pesadas
@@ -126,7 +141,19 @@ export const listConversations = async ({
 
   // Aplicar filtro de búsqueda por contact_id si hay búsqueda
   if (matchingContactIds && matchingContactIds.length > 0) {
-    query = query.in("contact_id", matchingContactIds);
+    // If we also have comercial visibility filtering, intersect both sets
+    if (visibleContactIds !== null) {
+      const intersection = matchingContactIds.filter(id => visibleContactIds.includes(id));
+      if (intersection.length === 0) {
+        return { conversations: [], total: 0, page, pageSize, totalPages: 0 };
+      }
+      query = query.in("contact_id", intersection);
+    } else {
+      query = query.in("contact_id", matchingContactIds);
+    }
+  } else if (visibleContactIds !== null) {
+    // Apply comercial visibility filter (no search)
+    query = query.in("contact_id", visibleContactIds);
   }
 
   if (filters.channel) {

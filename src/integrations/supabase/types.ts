@@ -423,30 +423,36 @@ export type Database = {
       }
       crm_contacts: {
         Row: {
+          assigned_to: string | null
           attributes: Json | null
           created_at: string
           external_crm_id: string | null
           id: string
+          location_id: string | null
           nombre: string | null
           numero: string
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           attributes?: Json | null
           created_at?: string
           external_crm_id?: string | null
           id?: string
+          location_id?: string | null
           nombre?: string | null
           numero: string
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           attributes?: Json | null
           created_at?: string
           external_crm_id?: string | null
           id?: string
+          location_id?: string | null
           nombre?: string | null
           numero?: string
           tenant_id?: string
@@ -513,23 +519,35 @@ export type Database = {
       }
       profiles: {
         Row: {
+          comercial_role: Database["public"]["Enums"]["comercial_role"] | null
           created_at: string
           email: string
+          external_id: string | null
+          full_name: string | null
           id: string
+          location_id: string | null
           tenant_id: string | null
           updated_at: string
         }
         Insert: {
+          comercial_role?: Database["public"]["Enums"]["comercial_role"] | null
           created_at?: string
           email: string
+          external_id?: string | null
+          full_name?: string | null
           id: string
+          location_id?: string | null
           tenant_id?: string | null
           updated_at?: string
         }
         Update: {
+          comercial_role?: Database["public"]["Enums"]["comercial_role"] | null
           created_at?: string
           email?: string
+          external_id?: string | null
+          full_name?: string | null
           id?: string
+          location_id?: string | null
           tenant_id?: string | null
           updated_at?: string
         }
@@ -864,13 +882,16 @@ export type Database = {
       }
       user_invitations: {
         Row: {
+          comercial_role: Database["public"]["Enums"]["comercial_role"] | null
           completed_at: string | null
           created_at: string | null
           email: string
           expires_at: string | null
+          external_id: string | null
           full_name: string
           id: string
           invited_by: string
+          location_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           status: string | null
           tenant_id: string | null
@@ -878,13 +899,16 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          comercial_role?: Database["public"]["Enums"]["comercial_role"] | null
           completed_at?: string | null
           created_at?: string | null
           email: string
           expires_at?: string | null
+          external_id?: string | null
           full_name: string
           id?: string
           invited_by: string
+          location_id?: string | null
           role: Database["public"]["Enums"]["app_role"]
           status?: string | null
           tenant_id?: string | null
@@ -892,13 +916,16 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          comercial_role?: Database["public"]["Enums"]["comercial_role"] | null
           completed_at?: string | null
           created_at?: string | null
           email?: string
           expires_at?: string | null
+          external_id?: string | null
           full_name?: string
           id?: string
           invited_by?: string
+          location_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string | null
           tenant_id?: string | null
@@ -1259,6 +1286,7 @@ export type Database = {
     Enums: {
       app_role: "user_client" | "super_admin"
       appointment_type: "call" | "in_person"
+      comercial_role: "director_comercial_general" | "director_sede" | "comercial"
       appointment_status:
         | "scheduled"
         | "confirmed"
@@ -1423,6 +1451,7 @@ export const Constants = {
     Enums: {
       app_role: ["user_client", "super_admin"],
       appointment_type: ["call", "in_person"],
+      comercial_role: ["director_comercial_general", "director_sede", "comercial"],
       appointment_status: [
         "scheduled",
         "confirmed",

@@ -15,11 +15,14 @@ export function useContacts(
 ) {
   const { scope } = useAuth();
 
+  // When user has a comercial role, bypass API gateway (it lacks comercial filtering)
+  const useGateway = USE_API_GATEWAY && !scope?.comercialRole;
+
   return useQuery({
     // SECURITY: Include tenantId in query key to prevent cache cross-contamination
-    queryKey: ['contacts', scope?.tenantId, filters, page, pageSize],
+    queryKey: ['contacts', scope?.tenantId, scope?.comercialRole, filters, page, pageSize],
     queryFn: async () => {
-      if (USE_API_GATEWAY) {
+      if (useGateway) {
         // NEW: API Gateway
         const response = await contactsApi.getContacts({
           search: filters.search,
@@ -32,8 +35,8 @@ export function useContacts(
           total: response.meta.total,
         };
       } else {
-        // OLD: Direct Supabase
-        return contactService.getContacts(filters, page, pageSize);
+        // Direct Supabase (with comercial role filtering)
+        return contactService.getContacts(filters, page, pageSize, scope ?? undefined);
       }
     },
     enabled: !!scope?.tenantId,
@@ -43,22 +46,25 @@ export function useContacts(
 export function useContact(id: string) {
   const { scope } = useAuth();
 
+  // When user has a comercial role, bypass API gateway (it lacks comercial filtering)
+  const useGateway = USE_API_GATEWAY && !scope?.comercialRole;
+
   return useQuery({
     // SECURITY: Include tenantId in query key to prevent cache cross-contamination
     queryKey: ['contact', scope?.tenantId, id],
     queryFn: async () => {
-      if (USE_API_GATEWAY) {
-        // NEW: API Gateway
+      if (useGateway) {
+        // API Gateway
         return contactsApi.getContact(id);
       } else {
-        // OLD: Direct Supabase
+        // Direct Supabase
         if (!scope) {
           throw new Error('User scope not available');
         }
         return contactService.getContact(id, scope);
       }
     },
-    enabled: !!id && (USE_API_GATEWAY ? true : !!scope),
+    enabled: !!id && (useGateway ? true : !!scope),
   });
 }
 
