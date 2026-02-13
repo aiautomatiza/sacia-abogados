@@ -5,8 +5,11 @@ import type { UserScope } from '@/features/conversations';
  * Applies comercial role-based visibility filters to a crm_contacts query.
  * - null role (owner): no additional filter
  * - director_comercial_general: no additional filter
- * - director_sede: contacts in their sede + unassigned contacts (location_id IS NULL)
+ * - director_sede: only contacts in their sede (location_id matches)
  * - comercial: only contacts assigned to them
+ *
+ * Contacts without location_id or assigned_to are only visible to
+ * users without comercial role and director_comercial_general.
  */
 // Supabase query builder types are complex, generic constraint needs any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,9 +25,9 @@ export function applyContactVisibilityFilter<T extends Record<string, any>>(
       return query;
 
     case 'director_sede':
-      // Contacts in their sede + unassigned (no location)
+      // Only contacts in their sede (excludes contacts without location)
       if (scope.locationId) {
-        return query.or(`location_id.eq.${scope.locationId},location_id.is.null`);
+        return query.eq('location_id', scope.locationId);
       }
       return query;
 
@@ -56,7 +59,7 @@ export async function getVisibleContactIdsForScope(
     .eq('tenant_id', scope.tenantId);
 
   if (scope.comercialRole === 'director_sede' && scope.locationId) {
-    query = query.or(`location_id.eq.${scope.locationId},location_id.is.null`);
+    query = query.eq('location_id', scope.locationId);
   } else if (scope.comercialRole === 'comercial') {
     query = query.eq('assigned_to', scope.userId);
   }
