@@ -78,6 +78,7 @@ export interface ConversationFilters {
   unread_only?: boolean;
   pending_response_only?: boolean;
   whatsapp_number_id?: string;
+  contact_status_ids?: string[];
   sort_by?: 'last_message' | 'created_at' | 'unread_first' | 'name';
   sort_order?: 'asc' | 'desc';
 }
@@ -97,6 +98,7 @@ export interface LocalConversationFilters {
   created_at_to?: string;
   pending_response?: boolean;
   whatsapp_number_id?: string;
+  contact_status_ids?: string[];
   sort_by?: 'last_message' | 'created_at' | 'unread_first' | 'name';
   sort_order?: 'asc' | 'desc';
 }

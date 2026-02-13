@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ConversationItem } from './ConversationItem';
 import { ConversationsSkeleton } from './ConversationsSkeleton';
+import { useActiveContactStatuses } from '@/features/contacts/hooks/useContactStatuses';
 import type { ConversationWithContact, LocalConversationFilters as ConversationFilters } from "../types";
 
 interface Props {
@@ -55,6 +56,7 @@ export function ConversationsSidebar({
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<SortField>(filters.sort_by || "last_message");
   const [sortDirection, setSortDirection] = useState<SortDirection>(filters.sort_order || "desc");
+  const { data: contactStatuses } = useActiveContactStatuses();
 
   // Ref for virtualization
   const parentRef = useRef<HTMLDivElement>(null);
@@ -137,6 +139,14 @@ export function ConversationsSidebar({
     const newDirection = sortDirection === "desc" ? "asc" : "desc";
     setSortDirection(newDirection);
     onFiltersChange?.({ ...filters, sort_by: sortField, sort_order: newDirection });
+  };
+
+  const toggleContactStatus = (statusId: string) => {
+    const current = filters.contact_status_ids || [];
+    const next = current.includes(statusId)
+      ? current.filter(id => id !== statusId)
+      : [...current, statusId];
+    onFiltersChange?.({ ...filters, contact_status_ids: next.length > 0 ? next : undefined });
   };
 
   return (
@@ -242,6 +252,29 @@ export function ConversationsSidebar({
                 No leídas
               </Button>
             </div>
+
+            {/* Contact Status Filter */}
+            {contactStatuses && contactStatuses.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-xs text-muted-foreground font-medium">Estado del contacto</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {contactStatuses.map((status) => {
+                    const isSelected = filters.contact_status_ids?.includes(status.id);
+                    return (
+                      <Button
+                        key={status.id}
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => toggleContactStatus(status.id)}
+                      >
+                        {status.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

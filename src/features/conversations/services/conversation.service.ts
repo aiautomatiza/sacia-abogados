@@ -97,6 +97,46 @@ export const listConversations = async ({
     }
   }
 
+  // Contact status filtering: pre-fetch contact IDs with matching statuses
+  let statusContactIds: string[] | null = null;
+
+  if (filters.contact_status_ids && filters.contact_status_ids.length > 0) {
+    const { data: statusContacts, error: statusError } = await supabase
+      .from("crm_contacts")
+      .select("id")
+      .eq("tenant_id", scope.tenantId)
+      .in("status_id", filters.contact_status_ids)
+      .limit(500);
+
+    if (statusError) {
+      console.error("Error filtering contacts by status:", statusError);
+      throw statusError;
+    }
+
+    statusContactIds = statusContacts?.map(c => c.id) || [];
+
+    if (statusContactIds.length === 0) {
+      return {
+        conversations: [],
+        total: 0,
+        page,
+        pageSize,
+        totalPages: 0,
+      };
+    }
+
+    // Intersect with search results if both filters are active
+    if (matchingContactIds !== null) {
+      const statusSet = new Set(statusContactIds);
+      matchingContactIds = matchingContactIds.filter(id => statusSet.has(id));
+      if (matchingContactIds.length === 0) {
+        return { conversations: [], total: 0, page, pageSize, totalPages: 0 };
+      }
+    } else {
+      matchingContactIds = statusContactIds;
+    }
+  }
+
   let query = supabase
     .from("conversations")
     .select(

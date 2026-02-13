@@ -58,6 +58,9 @@ export async function getConversations(
   if (filters.whatsapp_number_id) {
     params.whatsapp_number_id = filters.whatsapp_number_id;
   }
+  if (filters.contact_status_ids && filters.contact_status_ids.length > 0) {
+    params.contact_status_ids = filters.contact_status_ids.join(',');
+  }
   if (filters.sort_by) {
     params.sort_by = filters.sort_by;
   }

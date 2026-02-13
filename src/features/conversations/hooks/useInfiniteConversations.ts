@@ -13,8 +13,8 @@ export function useInfiniteConversations(filters: ConversationFilters = {}) {
   const { user, scope } = useAuth();
   const { tenantId } = useProfile();
 
-  // When user has a comercial role, bypass API gateway (it lacks comercial filtering)
-  const useGateway = USE_API_GATEWAY && !scope?.comercialRole;
+  // Bypass API gateway when it lacks server-side support for the filter
+  const useGateway = USE_API_GATEWAY && !scope?.comercialRole && !(filters.contact_status_ids?.length);
 
   const query = useInfiniteQuery({
     queryKey: ["conversations", "infinite", tenantId, scope?.comercialRole, filters],

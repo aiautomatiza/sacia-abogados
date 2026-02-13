@@ -137,16 +137,17 @@ export const ConversationItem = memo(
                 >
                   Equipo
                   {onRemoveTeamState && (
-                    <button
+                    <span
+                      role="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemoveTeamState(conversation.id);
                       }}
-                      className="ml-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
+                      className="ml-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 cursor-pointer"
                       title="Quitar estado de equipo"
                     >
                       <X className="h-2.5 w-2.5" />
-                    </button>
+                    </span>
                   )}
                 </Badge>
               )}

@@ -33,6 +33,7 @@ const toServiceFilters = (filters: LocalConversationFilters): ConversationFilter
     tags: filters.tags,
     unread_only: filters.has_unread,
     pending_response_only: filters.pending_response,
+    contact_status_ids: filters.contact_status_ids,
     sort_by: filters.sort_by,
     sort_order: filters.sort_order,
   };
@@ -66,6 +67,7 @@ export default function Conversations() {
     tags: storedFilters.tags,
     has_unread: storedFilters.unread_only,
     pending_response: storedFilters.pending_response_only,
+    contact_status_ids: storedFilters.contact_status_ids,
     sort_by: storedFilters.sort_by,
     sort_order: storedFilters.sort_order,
   };
@@ -80,6 +82,7 @@ export default function Conversations() {
       tags: newFilters.tags,
       unread_only: newFilters.has_unread,
       pending_response_only: newFilters.pending_response,
+      contact_status_ids: newFilters.contact_status_ids,
       sort_by: newFilters.sort_by,
       sort_order: newFilters.sort_order,
     });
