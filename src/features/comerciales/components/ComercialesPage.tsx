@@ -59,12 +59,10 @@ export function ComercialesPage() {
 
   // Filter list based on caller's role:
   // - admin/director_general: see all
-  // - director_sede: see users in their sede + unassigned in their sede
+  // - director_sede: only users in their sede
   const filteredComerciales = useMemo(() => {
     if (comercialRole === 'director_sede' && callerLocationId) {
-      return comerciales.filter(
-        (u) => u.location_id === callerLocationId || u.location_id === null
-      );
+      return comerciales.filter((u) => u.location_id === callerLocationId);
     }
     return comerciales;
   }, [comerciales, comercialRole, callerLocationId]);

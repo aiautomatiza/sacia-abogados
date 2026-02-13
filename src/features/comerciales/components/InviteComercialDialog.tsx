@@ -78,8 +78,8 @@ export function InviteComercialDialog({
       return;
     }
 
-    if (comercialRole === 'director_sede' && !locationId) {
-      toast.error('Director de Sede requiere seleccionar una sede');
+    if (comercialRole !== 'director_comercial_general' && !locationId) {
+      toast.error('Debes seleccionar una sede');
       return;
     }
 
@@ -93,7 +93,7 @@ export function InviteComercialDialog({
           role: 'user_client',
           tenant_id: scope?.tenantId,
           comercial_role: comercialRole,
-          location_id: comercialRole === 'director_sede' ? locationId : null,
+          location_id: comercialRole === 'director_comercial_general' ? null : locationId,
           external_id: externalId.trim(),
         },
       });
@@ -183,7 +183,7 @@ export function InviteComercialDialog({
               </Select>
             </div>
 
-            {comercialRole === 'director_sede' && (
+            {comercialRole !== 'director_comercial_general' && (
               <div className="grid gap-2">
                 <Label>Sede *</Label>
                 <Select value={locationId} onValueChange={setLocationId}>

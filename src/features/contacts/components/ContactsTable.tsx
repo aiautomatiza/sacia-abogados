@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale';
 import { StatusBadge } from './StatusBadge';
 import { useActiveContactStatuses } from '../hooks/useContactStatuses';
 import { useAppointmentsEnabled } from '@/hooks/useTenantSettings';
+import { useActiveLocations } from '@/features/locations/hooks/use-locations';
 import { AppointmentIndicator, QuickAppointmentButton } from '@/features/appointments';
 import type { Contact, CustomField } from '../types';
 
@@ -29,12 +30,18 @@ export function ContactsTable({
 }: ContactsTableProps) {
   const { data: statuses = [] } = useActiveContactStatuses();
   const { isEnabled: appointmentsEnabled } = useAppointmentsEnabled();
+  const { data: locations } = useActiveLocations();
   const allSelected = contacts.length > 0 && selectedIds.length === contacts.length;
 
   // Helper to get status object from status_id
   const getStatus = (statusId: string | null) => {
     if (!statusId) return null;
     return statuses.find(s => s.id === statusId) || null;
+  };
+
+  const getLocationName = (locationId: string | null) => {
+    if (!locationId || !locations) return '-';
+    return locations.find(l => l.id === locationId)?.name || '-';
   };
 
   const handleSelectAll = () => {
@@ -87,6 +94,7 @@ export function ContactsTable({
               <TableHead className="bg-muted">Número</TableHead>
               <TableHead className="bg-muted">Nombre</TableHead>
               <TableHead className="bg-muted">Estado</TableHead>
+              <TableHead className="bg-muted">Sede</TableHead>
               {appointmentsEnabled && (
                 <TableHead className="bg-muted w-24">Citas</TableHead>
               )}
@@ -101,7 +109,7 @@ export function ContactsTable({
             {contacts.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6 + customFields.length + (appointmentsEnabled ? 1 : 0)}
+                  colSpan={7 + customFields.length + (appointmentsEnabled ? 1 : 0)}
                   className="text-center text-muted-foreground py-8"
                 >
                   No hay contactos. Crea uno nuevo o importa desde CSV.
@@ -122,6 +130,7 @@ export function ContactsTable({
                   <TableCell>
                     <StatusBadge status={getStatus(contact.status_id)} />
                   </TableCell>
+                  <TableCell>{getLocationName(contact.location_id)}</TableCell>
                   {appointmentsEnabled && (
                     <TableCell>
                       <div className="flex items-center gap-2">

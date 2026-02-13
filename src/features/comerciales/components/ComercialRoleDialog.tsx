@@ -97,7 +97,7 @@ export function ComercialRoleDialog({
         {
           userId: user.id,
           comercialRole: role,
-          locationId: role === 'director_sede' ? locationId || null : null,
+          locationId: role === 'director_comercial_general' ? null : (locationId || null),
           externalId: externalId.trim() || null,
         },
         { onSuccess: () => onOpenChange(false) }
@@ -159,9 +159,9 @@ export function ComercialRoleDialog({
               </div>
             )}
 
-            {role === 'director_sede' && (
+            {role !== 'none' && role !== 'director_comercial_general' && (
               <div className="grid gap-2">
-                <Label>Sede</Label>
+                <Label>Sede *</Label>
                 <Select value={locationId} onValueChange={setLocationId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar sede" />
@@ -186,7 +186,7 @@ export function ComercialRoleDialog({
           {canManageTarget && (
             <Button
               onClick={handleSubmit}
-              disabled={isLoading || (role === 'director_sede' && !locationId) || (role !== 'none' && !externalId.trim())}
+              disabled={isLoading || (role !== 'none' && role !== 'director_comercial_general' && !locationId) || (role !== 'none' && !externalId.trim())}
             >
               {isLoading ? 'Guardando...' : 'Guardar'}
             </Button>

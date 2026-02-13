@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
-import { verifySuperAdmin } from '../_shared/auth.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const corsHeaders = {
@@ -37,9 +36,6 @@ Deno.serve(async (req) => {
       throw new Error('No autenticado');
     }
 
-    // Verify user is super_admin
-    await verifySuperAdmin(supabaseClient, user.id);
-
     // Create admin client for privileged operations
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -59,6 +55,29 @@ Deno.serve(async (req) => {
 
     if (role === 'user_client' && !tenant_id) {
       throw new Error('user_client requiere tenant_id');
+    }
+
+    // Authorization: super_admin can invite anyone; user_client can only invite into their own tenant
+    const { data: callerRoles } = await supabaseClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+    const callerIsSuperAdmin = callerRoles?.some((r: any) => r.role === 'super_admin');
+
+    if (!callerIsSuperAdmin) {
+      // Non-super_admin: can only invite user_client into their own tenant
+      if (role === 'super_admin') {
+        throw new Error('Solo un super_admin puede invitar a otro super_admin');
+      }
+      const { data: callerProfile } = await adminClient
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!callerProfile?.tenant_id || callerProfile.tenant_id !== tenant_id) {
+        throw new Error('No autorizado para invitar a este tenant');
+      }
     }
 
     // Verify tenant exists if provided
