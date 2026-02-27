@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Settings, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -14,65 +14,53 @@ import {
   ContactFilters,
   ContactsPagination,
   useContactsUrlState,
-  useContactsPagination,
   type Contact,
 } from "@/features/contacts";
+
+const DEFAULT_PAGE_SIZE = 30;
+const PAGE_SIZE_OPTIONS = [10, 30, 50, 100];
 
 export default function Contacts() {
   const { scope } = useAuth();
 
-  // URL state management
+  // URL is the single source of truth for page and search
   const { urlPage, urlSearch, setUrlPage, setUrlSearch } = useContactsUrlState();
 
-  // Pagination state (controlled)
-  const {
-    page,
-    pageSize,
-    setPage,
-    setPageSize,
-    goToNext,
-    goToPrevious,
-    goToFirst,
-    getPaginationInfo,
-    validatePage,
-    pageSizeOptions,
-  } = useContactsPagination();
+  // Page size is local-only (no URL persistence needed)
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
 
   // Local state
-  const [search, setSearch] = useState("");
   const [statusIds, setStatusIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Sync page from URL on mount
-  useEffect(() => {
-    if (urlPage !== page) {
-      setPage(urlPage);
-    }
-  }, [urlPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Use URL state directly — no bidirectional sync needed
+  const page = urlPage;
+  const search = urlSearch;
 
-  // Update URL when page changes
-  useEffect(() => {
-    if (page !== urlPage) {
-      setUrlPage(page);
-    }
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pagination actions that update URL directly
+  const setPage = useCallback((newPage: number) => {
+    setUrlPage(Math.max(1, newPage));
+  }, [setUrlPage]);
 
-  // Sync search from URL on mount
-  useEffect(() => {
-    if (urlSearch !== search) {
-      setSearch(urlSearch);
-    }
-  }, [urlSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goToNext = useCallback(() => {
+    setUrlPage(page + 1);
+  }, [setUrlPage, page]);
 
-  // Update URL when search changes
-  useEffect(() => {
-    if (search !== urlSearch) {
-      setUrlSearch(search);
-    }
-  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goToPrevious = useCallback(() => {
+    setUrlPage(Math.max(page - 1, 1));
+  }, [setUrlPage, page]);
+
+  const setPageSize = useCallback((newSize: number) => {
+    setPageSizeState(newSize);
+    setUrlPage(1); // Reset to first page when changing page size
+  }, [setUrlPage]);
+
+  const setSearch = useCallback((newSearch: string) => {
+    setUrlSearch(newSearch);
+  }, [setUrlSearch]);
 
   // Data fetching with pageSize
   const { data: contactsData, isLoading } = useContacts({ search, status_ids: statusIds }, page, pageSize);
@@ -101,21 +89,23 @@ export default function Contacts() {
     enabled: !!scope?.tenantId,
   });
 
-  // Calculate pagination info
-  const paginationInfo = useMemo(
-    () => getPaginationInfo(totalCount),
-    [getPaginationInfo, totalCount]
-  );
+  // Calculate pagination info from URL page + totalCount
+  const paginationInfo = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+    const to = Math.min(page * pageSize, totalCount);
+    const canGoNext = page < totalPages;
+    const canGoPrevious = page > 1;
+    return { totalPages, totalCount, from, to, canGoNext, canGoPrevious };
+  }, [page, pageSize, totalCount]);
 
-  // Validate page when totalCount changes
+  // Validate page when totalCount changes (e.g. after filtering reduces results)
   useEffect(() => {
-    validatePage(totalCount);
-  }, [totalCount, validatePage]);
-
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    goToFirst();
-  }, [search, goToFirst]);
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (page > totalPages) {
+      setUrlPage(totalPages);
+    }
+  }, [totalCount, pageSize, page, setUrlPage]);
 
   const handleEdit = (contact: Contact) => {
     setSelectedContact(contact);
@@ -196,7 +186,7 @@ export default function Contacts() {
             currentPage={page}
             totalPages={paginationInfo.totalPages}
             pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             from={paginationInfo.from}
             to={paginationInfo.to}
             totalCount={totalCount}
