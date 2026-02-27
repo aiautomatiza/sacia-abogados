@@ -63,7 +63,7 @@ export default function Contacts() {
   }, [setUrlSearch]);
 
   // Data fetching with pageSize
-  const { data: contactsData, isLoading } = useContacts({ search, status_ids: statusIds }, page, pageSize);
+  const { data: contactsData, isLoading, isFetching } = useContacts({ search, status_ids: statusIds }, page, pageSize);
   const { data: customFields = [] } = useCustomFields();
   const { deleteContactsBulk } = useContactMutations();
 
@@ -100,12 +100,15 @@ export default function Contacts() {
   }, [page, pageSize, totalCount]);
 
   // Validate page when totalCount changes (e.g. after filtering reduces results)
+  // IMPORTANT: Skip while fetching — during a page change, data is undefined momentarily,
+  // which makes totalCount=0, totalPages=1, and would reset the page back to 1.
   useEffect(() => {
+    if (isFetching) return;
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
     if (page > totalPages) {
       setUrlPage(totalPages);
     }
-  }, [totalCount, pageSize, page, setUrlPage]);
+  }, [totalCount, pageSize, page, setUrlPage, isFetching]);
 
   const handleEdit = (contact: Contact) => {
     setSelectedContact(contact);

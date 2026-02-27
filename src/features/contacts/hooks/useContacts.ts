@@ -40,6 +40,10 @@ export function useContacts(
       }
     },
     enabled: !!scope?.tenantId,
+    // Keep previous page data visible while the new page loads.
+    // Without this, data becomes undefined on page change, totalCount drops to 0,
+    // and the page validation useEffect resets the page back to 1.
+    placeholderData: (previousData) => previousData,
   });
 }
 
