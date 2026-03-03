@@ -49,8 +49,19 @@ export type TemplateVariableMapping = {
 
 const parseVariables = (variables: any): WhatsAppTemplateVariable[] => {
   if (Array.isArray(variables)) return variables as WhatsAppTemplateVariable[];
-  if (variables && typeof variables === 'object') {
-    return Object.entries(variables)
+
+  let parsed = variables;
+  if (typeof variables === 'string') {
+    try {
+      parsed = JSON.parse(variables);
+    } catch (e) {
+      console.warn("Error parsing template variables JSON:", e);
+      return [];
+    }
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    return Object.entries(parsed)
       .map(([name, position]) => ({ name, position: Number(position) }))
       .sort((a, b) => a.position - b.position);
   }
