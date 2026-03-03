@@ -47,6 +47,16 @@ export type TemplateVariableMapping = {
   };
 };
 
+const parseVariables = (variables: any): WhatsAppTemplateVariable[] => {
+  if (Array.isArray(variables)) return variables as WhatsAppTemplateVariable[];
+  if (variables && typeof variables === 'object') {
+    return Object.entries(variables)
+      .map(([name, position]) => ({ name, position: Number(position) }))
+      .sort((a, b) => a.position - b.position);
+  }
+  return [];
+};
+
 /**
  * List WhatsApp templates for a tenant (using scope)
  */
@@ -57,7 +67,7 @@ export const listTemplatesByScope = async (scope: UserScope | null): Promise<Wha
     .from("whatsapp_templates")
     .select("*")
     .eq("tenant_id", scope.tenantId)
-    .eq("status", "approved")
+    .ilike("status", "approved")
     .order("name", { ascending: true });
 
   if (error) {
@@ -105,7 +115,7 @@ export const listTemplates = async (tenantId: string): Promise<WhatsAppTemplate[
     ...template,
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
-    variables: (Array.isArray(template.variables) ? template.variables : []) as unknown as WhatsAppTemplateVariable[],
+    variables: parseVariables(template.variables),
   }));
 };
 
@@ -130,7 +140,7 @@ export const getTemplateById = async (id: string): Promise<WhatsAppTemplate | nu
     ...data,
     category: data.category as WhatsAppTemplateCategory,
     status: data.status as WhatsAppTemplateStatus,
-    variables: (Array.isArray(data.variables) ? data.variables : []) as unknown as WhatsAppTemplateVariable[],
+    variables: parseVariables(data.variables),
   };
 };
 
@@ -142,7 +152,7 @@ export const listApprovedTemplates = async (tenantId: string): Promise<WhatsAppT
     .from("whatsapp_templates")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("status", "APPROVED")
+    .ilike("status", "approved")
     .order("name", { ascending: true });
 
   if (error) {
@@ -154,7 +164,7 @@ export const listApprovedTemplates = async (tenantId: string): Promise<WhatsAppT
     ...template,
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
-    variables: (Array.isArray(template.variables) ? template.variables : []) as unknown as WhatsAppTemplateVariable[],
+    variables: parseVariables(template.variables),
   }));
 };
 
@@ -191,7 +201,7 @@ export const createTemplate = async (
     ...data,
     category: data.category as WhatsAppTemplateCategory,
     status: data.status as WhatsAppTemplateStatus,
-    variables: (Array.isArray(data.variables) ? data.variables : []) as unknown as WhatsAppTemplateVariable[],
+    variables: parseVariables(data.variables),
   };
 };
 
@@ -233,7 +243,7 @@ export const listTemplatesByWaba = async (
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("waba_id", wabaId)
-    .eq("status", "APPROVED")
+    .ilike("status", "approved")
     .order("name", { ascending: true });
 
   if (error) {
@@ -245,7 +255,7 @@ export const listTemplatesByWaba = async (
     ...template,
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
-    variables: (Array.isArray(template.variables) ? template.variables : []) as unknown as WhatsAppTemplateVariable[],
+    variables: parseVariables(template.variables),
   }));
 };
 
