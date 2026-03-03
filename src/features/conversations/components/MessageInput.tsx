@@ -197,6 +197,7 @@ export function MessageInput({ conversation, currentUserId, onSendMessage, onUpl
     return (
       <div className="border-t p-4 bg-background">
         <TemplateSelector
+          contact={conversation.contact}
           conversationId={conversation.id}
           onSelect={handleTemplateSelected}
           onCancel={() => setShowTemplateSelector(false)}

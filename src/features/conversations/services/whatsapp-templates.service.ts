@@ -8,6 +8,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type { UserScope } from "../types";
 
 export type WhatsAppTemplateRow = Database["public"]["Tables"]["whatsapp_templates"]["Row"];
+export type WhatsAppTemplateMappingRow = Database["public"]["Tables"]["whatsapp_template_mappings"]["Row"];
 
 // WhatsApp Template types
 export type WhatsAppTemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
@@ -34,6 +35,17 @@ export interface WhatsAppTemplate {
   created_at: string;
   updated_at: string;
 }
+
+export type TemplateVariableMapping = {
+  position: number;
+  variableName: string;
+  source: {
+    type: 'fixed_field' | 'custom_field' | 'static_value';
+    field?: 'nombre' | 'numero';
+    fieldName?: string;
+    value?: string;
+  };
+};
 
 /**
  * List WhatsApp templates for a tenant (using scope)
@@ -286,6 +298,54 @@ export const deleteTemplate = async (id: string): Promise<void> => {
 
   if (error) {
     console.error("Error deleting WhatsApp template:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get saved variable mappings for a template
+ */
+export const getTemplateMappings = async (
+  tenantId: string,
+  templateId: string
+): Promise<TemplateVariableMapping[]> => {
+  const { data, error } = await supabase
+    .from("whatsapp_template_mappings")
+    .select("mappings")
+    .eq("tenant_id", tenantId)
+    .eq("template_id", templateId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error getting template mappings:", error);
+    throw error;
+  }
+
+  return (data?.mappings as TemplateVariableMapping[]) || [];
+};
+
+/**
+ * Save variable mappings for a template
+ */
+export const saveTemplateMappings = async (
+  tenantId: string,
+  templateId: string,
+  mappings: TemplateVariableMapping[]
+): Promise<void> => {
+  // Use upsert to handle both insert and update
+  const { error } = await supabase
+    .from("whatsapp_template_mappings")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        template_id: templateId,
+        mappings: mappings as any,
+      },
+      { onConflict: "tenant_id,template_id" }
+    );
+
+  if (error) {
+    console.error("Error saving template mappings:", error);
     throw error;
   }
 };

@@ -12,8 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { WhatsAppTemplateRow } from "../services/whatsapp-templates.service";
+import { useAuth } from "@/contexts/auth-context";
+import { getTemplateMappings, type WhatsAppTemplateRow } from "../services/whatsapp-templates.service";
 import { useWhatsAppTemplatesForConversation } from "../hooks/useWhatsAppTemplates";
+import type { ConversationWithContact } from "../types";
 
 // Type guard for template variables
 type TemplateVariable = { name: string; position: number };
@@ -35,14 +37,65 @@ export interface TemplateSelectionData {
 
 interface TemplateSelectorProps {
   conversationId: string;
+  contact: ConversationWithContact['contact'];
   onSelect: (data: TemplateSelectionData) => Promise<void>;
   onCancel: () => void;
 }
 
-export function TemplateSelector({ conversationId, onSelect, onCancel }: TemplateSelectorProps) {
+export function TemplateSelector({ conversationId, contact, onSelect, onCancel }: TemplateSelectorProps) {
+  const { currentTenant } = useAuth();
   const { data: templates = [], isLoading } = useWhatsAppTemplatesForConversation(conversationId);
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [variableValues, setVariableValues] = React.useState<Record<string, string>>({});
+
+  // Effect to load and apply variable mappings when a template is selected
+  React.useEffect(() => {
+    async function loadAndApplyMappings() {
+      if (!currentTenant?.id || !selectedTemplateId || !contact) {
+        // Only clear if we explicitly changed templates to null or another that hasn't loaded
+        // Keep existing manual values while the new template is being selected/mapped manually
+        return; 
+      }
+
+      try {
+        const mappings = await getTemplateMappings(currentTenant.id, selectedTemplateId);
+        
+        if (mappings && mappings.length > 0) {
+          const newVariableValues: Record<string, string> = {};
+          
+          mappings.forEach((mapping) => {
+            const { position, source } = mapping;
+            let value = "";
+            
+            if (source.type === 'static_value') {
+              value = source.value || "";
+            } else if (source.type === 'fixed_field') {
+              if (source.field === 'nombre') {
+                value = contact.nombre || "";
+              } else if (source.field === 'numero') {
+                value = contact.numero || "";
+              }
+            } else if (source.type === 'custom_field' && source.fieldName) {
+              // Extract from attributes (custom fields)
+              const attributes = contact.attributes as Record<string, any>;
+              value = attributes ? (attributes[source.fieldName] || "") : "";
+            }
+            
+            newVariableValues[position.toString()] = value;
+          });
+          
+          setVariableValues(newVariableValues);
+        } else {
+          // If no mappings found, reset to empty
+          setVariableValues({});
+        }
+      } catch (error) {
+        console.error("Error loading template mappings:", error);
+      }
+    }
+
+    loadAndApplyMappings();
+  }, [selectedTemplateId, currentTenant?.id, contact]);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
@@ -101,7 +154,8 @@ export function TemplateSelector({ conversationId, onSelect, onCancel }: Templat
     Object.entries(variableValues).forEach(([position, value]) => {
       // Reemplaza {{1}}, {{2}}, etc. con los valores
       const placeholder = `{{${position}}}`;
-      result = result.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), value || placeholder);
+      const safeValue = value || placeholder;
+      result = result.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), safeValue);
     });
 
     return result;

@@ -10,12 +10,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomFieldsTab, StatusesTab } from '@/features/contacts';
 import { LocationsManager } from '@/features/locations';
+import { TemplateSettingsTab } from '@/features/conversations/components/TemplateSettingsTab';
 import { useAppointmentsEnabled } from '@/hooks/useTenantSettings';
 
 /**
  * Valid tab values
  */
-type TabValue = 'fields' | 'statuses' | 'locations';
+type TabValue = 'fields' | 'statuses' | 'locations' | 'whatsapp-templates';
 
 const DEFAULT_TAB: TabValue = 'fields';
 
@@ -47,7 +48,7 @@ export default function ContactSettings() {
   // Validate and set default tab if invalid
   useEffect(() => {
     const tab = searchParams.get('tab');
-    const validTabs = ['fields', 'statuses', 'locations'];
+    const validTabs = ['fields', 'statuses', 'locations', 'whatsapp-templates'];
     if (!tab || !validTabs.includes(tab)) {
       setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
     }
@@ -81,6 +82,7 @@ export default function ContactSettings() {
         <TabsList>
           <TabsTrigger value="fields">Campos Personalizados</TabsTrigger>
           <TabsTrigger value="statuses">Estados</TabsTrigger>
+          <TabsTrigger value="whatsapp-templates">Plantillas WhatsApp</TabsTrigger>
           {appointmentsEnabled && (
             <TabsTrigger value="locations">Sedes</TabsTrigger>
           )}
@@ -99,6 +101,10 @@ export default function ContactSettings() {
             <LocationsManager />
           </TabsContent>
         )}
+
+        <TabsContent value="whatsapp-templates" className="space-y-4">
+          <TemplateSettingsTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
