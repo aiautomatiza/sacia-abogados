@@ -148,6 +148,7 @@ export interface CampaignWizardState {
 
   // UI state
   loading: boolean;
+  previewContact?: any;
 }
 
 // Re-export filter types

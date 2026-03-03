@@ -78,7 +78,7 @@ export const listTemplatesByScope = async (scope: UserScope | null): Promise<Wha
     .from("whatsapp_templates")
     .select("*")
     .eq("tenant_id", scope.tenantId)
-    .ilike("status", "approved")
+    .eq("status", "APPROVED")
     .order("name", { ascending: true });
 
   if (error) {
@@ -163,7 +163,6 @@ export const listApprovedTemplates = async (tenantId: string): Promise<WhatsAppT
     .from("whatsapp_templates")
     .select("*")
     .eq("tenant_id", tenantId)
-    .ilike("status", "approved")
     .order("name", { ascending: true });
 
   if (error) {
@@ -171,7 +170,19 @@ export const listApprovedTemplates = async (tenantId: string): Promise<WhatsAppT
     throw error;
   }
 
-  return (data || []).map((template) => ({
+  console.log(`[DEBUG] listApprovedTemplates fetched ${data?.length} raw templates for tenant ${tenantId}`);
+  if (data?.length > 0) {
+    console.log("[DEBUG] First template status:", `"${data[0].status}"`);
+  }
+
+  // Filtrar localmente por si hay espacios ocultos o problemas de casing
+  const approvedData = (data || []).filter(
+    (t) => t.status && t.status.trim().toLowerCase() === "approved"
+  );
+
+  console.log(`[DEBUG] After local filtering: ${approvedData.length} templates remain.`);
+
+  return approvedData.map((template) => ({
     ...template,
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
@@ -254,7 +265,7 @@ export const listTemplatesByWaba = async (
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("waba_id", wabaId)
-    .ilike("status", "approved")
+    .in("status", ["approved", "APPROVED", "Approved"])
     .order("name", { ascending: true });
 
   if (error) {

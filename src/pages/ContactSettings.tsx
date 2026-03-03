@@ -62,13 +62,6 @@ export default function ContactSettings() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-6">
-        <Link to="/contacts">
-          <Button variant="ghost" className="gap-2 mb-4">
-            <ArrowLeft className="h-4 w-4" />
-            Volver a Contactos
-          </Button>
-        </Link>
-
         <div>
           <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
           <p className="text-muted-foreground mt-1">

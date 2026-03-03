@@ -43,7 +43,8 @@ interface TemplateSelectorProps {
 }
 
 export function TemplateSelector({ conversationId, contact, onSelect, onCancel }: TemplateSelectorProps) {
-  const { currentTenant } = useAuth();
+  const { scope } = useAuth();
+  const currentTenant = scope?.tenantId ? { id: scope.tenantId } : null;
   const { data: templates = [], isLoading } = useWhatsAppTemplatesForConversation(conversationId);
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [variableValues, setVariableValues] = React.useState<Record<string, string>>({});
@@ -77,8 +78,31 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
               }
             } else if (source.type === 'custom_field' && source.fieldName) {
               // Extract from attributes (custom fields)
-              const attributes = contact.attributes as Record<string, any>;
-              value = attributes ? (attributes[source.fieldName] || "") : "";
+              let attributes = contact.attributes as any;
+              if (typeof attributes === 'string') {
+                try {
+                  attributes = JSON.parse(attributes);
+                } catch {
+                  attributes = {};
+                }
+              }
+              
+              if (attributes) {
+                // Exact match
+                if (attributes[source.fieldName] !== undefined) {
+                  value = attributes[source.fieldName];
+                } else {
+                  // Fallback: case-insensitive match
+                  const matchingKey = Object.keys(attributes).find(
+                    k => k.toLowerCase() === source.fieldName!.toLowerCase()
+                  );
+                  if (matchingKey) {
+                    value = attributes[matchingKey];
+                  }
+                }
+              }
+              value = value || "";
+              console.log(`[DEBUG] Mapping custom field ${source.fieldName}:`, { attributes, value });
             }
             
             newVariableValues[position.toString()] = value;
@@ -151,10 +175,18 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     if (!text) return text;
 
     let result = text;
-    Object.entries(variableValues).forEach(([position, value]) => {
-      // Reemplaza {{1}}, {{2}}, etc. con los valores
+    templateVariables.forEach((variable) => {
+      const position = variable.position.toString();
+      const value = variableValues[position];
       const placeholder = `{{${position}}}`;
-      const safeValue = value || placeholder;
+      
+      let safeValue = placeholder;
+      if (value !== undefined && value !== null && value !== '') {
+        safeValue = value;
+      } else {
+        safeValue = `[${variable.name}]`;
+      }
+      
       result = result.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), safeValue);
     });
 

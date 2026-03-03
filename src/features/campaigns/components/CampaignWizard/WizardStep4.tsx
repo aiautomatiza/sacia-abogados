@@ -3,6 +3,7 @@
  * Works with both import and CRM contact sources
  */
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,8 @@ import { TemplateVariableMapper } from './TemplateVariableMapper';
 import { useWhatsAppNumbers } from '@/features/conversations/hooks/useWhatsAppNumbers';
 import { useWhatsAppTemplatesByWaba, useWhatsAppTemplates } from '@/features/conversations/hooks/useWhatsAppTemplates';
 import { useCustomFields } from '@/features/contacts';
+import { useAuth } from '@/contexts/auth-context';
+import { getTemplateMappings } from '@/features/conversations/services/whatsapp-templates.service';
 import type { CampaignWizardState, ContactSourceType, SelectedTemplate, TemplateVariableMapping } from '../../types';
 
 interface WizardStep4Props {
@@ -47,6 +50,7 @@ export function WizardStep4({
   onBack,
   onNewCampaign,
 }: WizardStep4Props) {
+  const { scope } = useAuth();
   const { data: whatsappNumbers = [], isLoading: loadingNumbers } = useWhatsAppNumbers();
   const activeNumbers = whatsappNumbers.filter(n => n.status === 'active');
 
@@ -62,6 +66,27 @@ export function WizardStep4({
   // Use WABA-filtered templates if we have a WABA ID, otherwise use all templates
   const templates = state.selectedWhatsAppWabaId ? templatesByWaba : allTemplates;
   const loadingTemplates = state.selectedWhatsAppWabaId ? loadingTemplatesByWaba : loadingAllTemplates;
+
+  // Auto-load template mappings when template changes
+  useEffect(() => {
+    async function loadMappings() {
+      if (!scope?.tenantId || !state.selectedTemplate?.id) return;
+      try {
+        const mappings = await getTemplateMappings(scope.tenantId, state.selectedTemplate.id);
+        if (mappings && mappings.length > 0) {
+          // @ts-ignore - The structure is identical but imported from different files
+          onVariableMappingChange(mappings);
+        }
+      } catch (error) {
+        console.error("Error loading template mappings:", error);
+      }
+    }
+    
+    // Only fetch if we have a selected template and mapping is currently empty
+    if (state.selectedTemplate?.id && state.variableMapping.length === 0) {
+      loadMappings();
+    }
+  }, [state.selectedTemplate?.id, scope?.tenantId, onVariableMappingChange, state.variableMapping.length]);
 
   const totalBatches = Math.ceil(contactCount / 20);
   const estimatedMinutes = totalBatches > 1 ? (totalBatches - 1) * 2 : 0;
@@ -256,15 +281,40 @@ export function WizardStep4({
             )}
 
             {/* Variable Mapper (when template has variables) */}
-            {state.selectedTemplate && hasTemplateVariables && (
-              <TemplateVariableMapper
-                variables={state.selectedTemplate.variables}
-                customFields={customFields}
-                mapping={state.variableMapping}
-                bodyText={state.selectedTemplate.bodyText}
-                onMappingChange={onVariableMappingChange}
-              />
-            )}
+            {state.selectedTemplate && hasTemplateVariables && (() => {
+               // Extract the first contact for preview from import data
+               let previewContact: any = null;
+               
+               if (sourceType === 'import' && state.data.length > 0 && state.columns && state.mapping) {
+                 const row = state.data[0];
+                 const contactPreview: any = { attributes: {} };
+                 state.columns.forEach((col, idx) => {
+                   const value = row[idx];
+                   if (state.mapping[col] === 'numero') {
+                     contactPreview.numero = value;
+                   } else if (state.mapping[col] === 'nombre') {
+                     contactPreview.nombre = value;
+                   } else if (state.mapping[col]?.startsWith('custom:')) {
+                     const fieldName = state.mapping[col].replace('custom:', '');
+                     contactPreview.attributes[fieldName] = value;
+                   } else if (state.mapping[col] === 'custom') {
+                     contactPreview.attributes[col] = value;
+                   }
+                 });
+                 previewContact = contactPreview;
+               }
+
+               return (
+                  <TemplateVariableMapper
+                    variables={state.selectedTemplate.variables}
+                    customFields={customFields}
+                    mapping={state.variableMapping}
+                    bodyText={state.selectedTemplate.bodyText}
+                    onMappingChange={onVariableMappingChange}
+                    previewContact={previewContact}
+                  />
+               );
+            })()}
 
             {/* Warning if no templates */}
             {state.selectedWhatsAppNumberId && !loadingTemplates && templates.length === 0 && (

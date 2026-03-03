@@ -17,7 +17,7 @@ import { useContactSelection } from '../../hooks/useContactSelection';
 
 interface WizardStepContactsProps {
   onBack: () => void;
-  onNext: (getContactIds: () => Promise<string[]>, count: number) => void;
+  onNext: (getContactIds: () => Promise<string[]>, count: number, sampleContact?: any) => void;
 }
 
 export function WizardStepContacts({ onBack, onNext }: WizardStepContactsProps) {
@@ -36,9 +36,13 @@ export function WizardStepContacts({ onBack, onNext }: WizardStepContactsProps) 
 
   const handleNext = () => {
     if (selectionRef.current && selectionRef.current.selectedCount > 0) {
+      const firstContact = selectionRef.current.contacts.find((c: any) => selectionRef.current?.isSelected(c.id)) 
+        || selectionRef.current.contacts[0];
+      
       onNext(
         selectionRef.current.getSelectedContactIds,
-        selectionRef.current.selectedCount
+        selectionRef.current.selectedCount,
+        firstContact
       );
     }
   };

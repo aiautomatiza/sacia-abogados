@@ -28,6 +28,7 @@ interface TemplateVariableMapperProps {
   mapping: TemplateVariableMapping[];
   bodyText: string;
   onMappingChange: (mapping: TemplateVariableMapping[]) => void;
+  previewContact?: any; // Add optional contact data for accurate previews
 }
 
 type SourceType = 'fixed_field' | 'custom_field' | 'static_value';
@@ -49,6 +50,7 @@ export function TemplateVariableMapper({
   mapping,
   bodyText,
   onMappingChange,
+  previewContact,
 }: TemplateVariableMapperProps) {
   // Sort variables by position
   const sortedVariables = useMemo(
@@ -142,7 +144,7 @@ export function TemplateVariableMapper({
     onMappingChange(newMapping.sort((a, b) => a.position - b.position));
   };
 
-  // Generate preview text by replacing variables with example values
+  // Generate preview text by replacing variables with example values or real contact data
   const previewText = useMemo(() => {
     let text = bodyText;
 
@@ -153,11 +155,41 @@ export function TemplateVariableMapper({
       if (m) {
         switch (m.source.type) {
           case 'fixed_field':
-            value = EXAMPLE_VALUES[m.source.field] || `[${m.source.field}]`;
+            if (previewContact && m.source.field === 'numero') {
+              value = previewContact.numero || EXAMPLE_VALUES['numero'];
+            } else if (previewContact && m.source.field === 'nombre') {
+              value = previewContact.nombre || EXAMPLE_VALUES['nombre'];
+            } else {
+               value = EXAMPLE_VALUES[m.source.field] || `[${m.source.field}]`;
+            }
             break;
-          case 'custom_field': {
-            const field = customFields.find((f) => f.field_name === m.source.fieldName);
-            value = field ? `[${field.field_label}]` : `[${m.source.fieldName}]`;
+            
+        case 'custom_field': {
+            const source = m.source as { type: 'custom_field'; fieldName: string };
+            const field = customFields.find((f) => f.field_name === source.fieldName);
+            if (previewContact && previewContact.attributes && source.fieldName) {
+               // Extract real data if we have it
+               let attributes = previewContact.attributes;
+               if (typeof attributes === 'string') {
+                 try { attributes = JSON.parse(attributes); } catch { attributes = {}; }
+               }
+               
+               let contactVal = undefined;
+               if (attributes[source.fieldName] !== undefined) {
+                 contactVal = attributes[source.fieldName];
+               } else {
+                 const matchKey = Object.keys(attributes).find(k => k.toLowerCase() === source.fieldName!.toLowerCase());
+                 if (matchKey) contactVal = attributes[matchKey];
+               }
+               
+               if (contactVal !== undefined && contactVal !== "") {
+                  value = String(contactVal);
+               } else {
+                  value = field ? `[${field.field_label}]` : `[${source.fieldName}]`;
+               }
+            } else {
+               value = field ? `[${field.field_label}]` : `[${source.fieldName}]`;
+            }
             break;
           }
           case 'static_value':
@@ -170,14 +202,14 @@ export function TemplateVariableMapper({
     });
 
     return text;
-  }, [bodyText, sortedVariables, mapping, customFields]);
+  }, [bodyText, sortedVariables, mapping, customFields, previewContact]);
 
   // Check if all variables are mapped
   const unmappedVariables = sortedVariables.filter((v) => {
     const m = getMappingForVariable(v.position);
     if (!m) return true;
     if (m.source.type === 'static_value' && !m.source.value) return true;
-    if (m.source.type === 'custom_field' && !m.source.fieldName) return true;
+    if (m.source.type === 'custom_field' && !(m.source as { type: 'custom_field'; fieldName: string }).fieldName) return true;
     return false;
   });
 

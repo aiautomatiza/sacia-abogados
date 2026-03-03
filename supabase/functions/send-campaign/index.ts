@@ -19,9 +19,9 @@ interface VariableMapping {
   position: number;
   variableName: string;
   source:
-    | { type: 'fixed_field'; field: 'numero' | 'nombre' }
-    | { type: 'custom_field'; fieldName: string }
-    | { type: 'static_value'; value: string };
+  | { type: 'fixed_field'; field: 'numero' | 'nombre' }
+  | { type: 'custom_field'; fieldName: string }
+  | { type: 'static_value'; value: string };
 }
 
 // Resolve variables for a single contact based on the mapping
@@ -45,9 +45,32 @@ function resolveVariablesForContact(
         }
         break;
 
-      case 'custom_field':
-        value = contact.attributes?.[mapping.source.fieldName] ?? '';
+      case 'custom_field': {
+        const source = mapping.source as { type: 'custom_field'; fieldName: string };
+        let attributes: any = contact.attributes;
+        if (typeof attributes === 'string') {
+          try {
+            attributes = JSON.parse(attributes);
+          } catch {
+            attributes = {};
+          }
+        }
+
+        if (attributes && source.fieldName) {
+          if (attributes[source.fieldName] !== undefined) {
+            value = attributes[source.fieldName];
+          } else {
+            const matchingKey = Object.keys(attributes).find(
+              k => k.toLowerCase() === source.fieldName.toLowerCase()
+            );
+            if (matchingKey) {
+              value = attributes[matchingKey];
+            }
+          }
+        }
+        value = value || '';
         break;
+      }
 
       case 'static_value':
         value = mapping.source.value || '';
@@ -69,29 +92,29 @@ async function fetchContactsInBatches(
   batchSize: number = 100
 ): Promise<any[]> {
   const allContacts: any[] = [];
-  
+
   // Dividir IDs en lotes
   for (let i = 0; i < contactIds.length; i += batchSize) {
     const batch = contactIds.slice(i, i + batchSize);
-    
-    console.log(`Obteniendo lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(contactIds.length/batchSize)} (${batch.length} contactos)`);
-    
+
+    console.log(`Obteniendo lote ${Math.floor(i / batchSize) + 1}/${Math.ceil(contactIds.length / batchSize)} (${batch.length} contactos)`);
+
     const { data: batchContacts, error } = await supabaseClient
       .from('crm_contacts')
       .select('id, numero, nombre, attributes')
       .in('id', batch)
       .eq('tenant_id', tenantId);
-    
+
     if (error) {
-      console.error(`Error en lote ${i/batchSize + 1}:`, error);
+      console.error(`Error en lote ${i / batchSize + 1}:`, error);
       throw new Error(`Error al obtener contactos: ${error.message}`);
     }
-    
+
     if (batchContacts) {
       allContacts.push(...batchContacts);
     }
   }
-  
+
   return allContacts;
 }
 
@@ -183,8 +206,8 @@ Deno.serve(async (req) => {
     }
 
     // Get webhook URL from settings
-    const webhookUrl = channel === 'whatsapp' 
-      ? settings.whatsapp_webhook_url 
+    const webhookUrl = channel === 'whatsapp'
+      ? settings.whatsapp_webhook_url
       : settings.calls_webhook_url;
 
     if (!webhookUrl) {
@@ -306,7 +329,7 @@ Deno.serve(async (req) => {
 
       queueSuccess = true;
       const estimatedTimeMinutes = totalBatches > 1 ? (totalBatches - 1) * 2 : 0;
-      
+
       console.log(`✅ Campaña ${campaign.id} encolada: ${totalBatches} batches, tiempo estimado: ~${estimatedTimeMinutes} minutos`);
 
       // Return immediate response

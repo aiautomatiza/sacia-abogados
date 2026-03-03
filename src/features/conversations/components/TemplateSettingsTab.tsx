@@ -6,54 +6,64 @@ import { Loader2, Save, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { 
-  listApprovedTemplates, 
   getTemplateMappings, 
   saveTemplateMappings,
   type WhatsAppTemplate,
   type TemplateVariableMapping
 } from '../services/whatsapp-templates.service';
+import { useWhatsAppTemplates } from '../hooks/useWhatsAppTemplates';
 import { TemplateVariableMapper } from '@/features/campaigns/components/CampaignWizard/TemplateVariableMapper';
 import { useCustomFields } from '@/features/contacts/hooks/useCustomFields';
 
 export function TemplateSettingsTab() {
-  const { currentTenant } = useAuth();
+  const { scope } = useAuth();
+  const currentTenant = scope?.tenantId ? { id: scope.tenantId } : null;
   const { toast } = useToast();
-  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [mappings, setMappings] = useState<TemplateVariableMapping[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMappings, setIsLoadingMappings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Use the standard hook used across the app (like in campaigns)
+  const { data: rawTemplates = [], isLoading: isLoadingTemplates } = useWhatsAppTemplates();
+
+  // Format templates to ensure variables are correctly extracted
+  const templates = React.useMemo(() => {
+    return rawTemplates.map((template) => {
+      let variables = Array.isArray(template.variables) && template.variables.length > 0
+        ? template.variables.map((v: any) => ({
+            name: v.name || '',
+            position: v.position || 0,
+          }))
+        : [];
+
+      // If no variables in the field, extract from body_text (e.g., {{1}}, {{2}}) like in CampaignWizard
+      if (variables.length === 0 && template.body_text) {
+        const matches = template.body_text.match(/\{\{(\d+)\}\}/g);
+        if (matches) {
+          const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
+          variables = positions.sort((a, b) => a - b).map(pos => ({
+            name: `Variable ${pos}`,
+            position: pos,
+          }));
+        }
+      }
+
+      return {
+        ...template,
+        variables
+      } as WhatsAppTemplate;
+    });
+  }, [rawTemplates]);
 
   // Fetch custom fields for the variable mapper
   const { data: customFields = [] } = useCustomFields(currentTenant?.id);
-
-  // Load templates
-  useEffect(() => {
-    async function loadTemplates() {
-      if (!currentTenant?.id) return;
-      setIsLoading(true);
-      try {
-        const data = await listApprovedTemplates(currentTenant.id);
-        setTemplates(data);
-      } catch (error) {
-        console.error("Error loading templates:", error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar las plantillas de WhatsApp.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadTemplates();
-  }, [currentTenant?.id, toast]);
 
   // Load mappings when a template is selected
   useEffect(() => {
     async function loadMappings() {
       if (!currentTenant?.id || !selectedTemplateId) return;
-      setIsLoading(true);
+      setIsLoadingMappings(true);
       try {
         const data = await getTemplateMappings(currentTenant.id, selectedTemplateId);
         setMappings(data);
@@ -65,7 +75,7 @@ export function TemplateSettingsTab() {
           variant: "destructive",
         });
       } finally {
-        setIsLoading(false);
+        setIsLoadingMappings(false);
       }
     }
     loadMappings();
@@ -74,17 +84,23 @@ export function TemplateSettingsTab() {
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   const handleSave = async () => {
-    if (!currentTenant?.id || !selectedTemplateId) return;
+    console.log('[DEBUG] handleSave triggered', { currentTenantId: currentTenant?.id, selectedTemplateId, mappings });
+    if (!currentTenant?.id || !selectedTemplateId) {
+      console.log('[DEBUG] handleSave aborted: missing tenant or template ID');
+      return;
+    }
     
     setIsSaving(true);
     try {
+      console.log('[DEBUG] Calling saveTemplateMappings...');
       await saveTemplateMappings(currentTenant.id, selectedTemplateId, mappings);
+      console.log('[DEBUG] saveTemplateMappings succeeded');
       toast({
         title: "Éxito",
         description: "Configuración guardada correctamente.",
       });
     } catch (error) {
-      console.error("Error saving template mappings:", error);
+      console.error("[DEBUG] Error saving template mappings:", error);
       toast({
         title: "Error",
         description: "Ocurrió un error al guardar la configuración.",
@@ -92,10 +108,11 @@ export function TemplateSettingsTab() {
       });
     } finally {
       setIsSaving(false);
+      console.log('[DEBUG] handleSave finished');
     }
   };
 
-  if (isLoading && templates.length === 0) {
+  if (isLoadingTemplates) {
     return (
       <div className="flex justify-center items-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -117,7 +134,7 @@ export function TemplateSettingsTab() {
         {/* Selector de plantillas */}
         <div className="md:col-span-1 border-r pr-6 space-y-4">
           <h3 className="text-sm font-medium">Seleccionar Plantilla</h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
             {templates.map((template) => (
               <Button
                 key={template.id}
@@ -148,7 +165,7 @@ export function TemplateSettingsTab() {
                   <FileText className="h-5 w-5 text-primary" />
                   {selectedTemplate.name}
                 </h3>
-                <Button onClick={handleSave} disabled={isSaving || isLoading}>
+                <Button onClick={handleSave} disabled={isSaving || isLoadingMappings}>
                   {isSaving ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
@@ -159,10 +176,11 @@ export function TemplateSettingsTab() {
               </div>
 
               {selectedTemplate.variables && selectedTemplate.variables.length > 0 ? (
-                <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border">
+                <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
                   <TemplateVariableMapper
                     variables={selectedTemplate.variables}
                     customFields={customFields}
+                    // @ts-ignore - The structure is identical but imported from different files
                     mapping={mappings}
                     bodyText={selectedTemplate.body_text}
                     onMappingChange={setMappings}
