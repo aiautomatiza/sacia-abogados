@@ -160,6 +160,7 @@ export const listConversations = async ({
         id,
         nombre,
         numero,
+        attributes,
         status_id,
         status:crm_contact_statuses!crm_contacts_status_id_fkey (
           id,
