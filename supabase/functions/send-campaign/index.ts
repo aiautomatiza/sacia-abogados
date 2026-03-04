@@ -71,41 +71,23 @@ function resolveSourceValue(
 }
 
 // Resolve variables for a single contact based on the mapping.
-// Returns an object with parameters grouped by component for Meta API.
+// Returns an array of resolved variables for backward compatibility with n8n.
 function resolveVariablesForContact(
   contact: { numero: string; nombre: string | null; attributes: Record<string, any>; location?: any },
   variableMapping: VariableMapping[]
-): {
-  header_parameters: Array<{ type: string; text: string }>;
-  body_parameters: Array<{ type: string; text: string }>;
-  footer_parameters: Array<{ type: string; text: string }>;
-} {
+): Array<{ value: string; position: number; component: string }> {
   if (!variableMapping || variableMapping.length === 0) {
-    return { header_parameters: [], body_parameters: [], footer_parameters: [] };
+    return [];
   }
 
-  const header: Array<{ type: string; text: string }> = [];
-  const body: Array<{ type: string; text: string }> = [];
-  const footer: Array<{ type: string; text: string }> = [];
-
-  // Sort by position within each component
-  const sorted = [...variableMapping].sort((a, b) => a.position - b.position);
-
-  for (const mapping of sorted) {
+  return variableMapping.map((mapping) => {
     const value = resolveSourceValue(contact, mapping.source);
-    const param = { type: 'text', text: String(value) };
-    const component = mapping.component || 'BODY'; // Default to BODY for old data
-
-    if (component === 'HEADER') header.push(param);
-    else if (component === 'FOOTER') footer.push(param);
-    else body.push(param);
-  }
-
-  return {
-    header_parameters: header,
-    body_parameters: body,
-    footer_parameters: footer,
-  };
+    return {
+      value: String(value),
+      position: mapping.position,
+      component: mapping.component || 'BODY',
+    };
+  }).sort((a, b) => a.position - b.position);
 }
 
 // Function to fetch contacts in batches
