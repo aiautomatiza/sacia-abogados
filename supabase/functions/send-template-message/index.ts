@@ -1,6 +1,96 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import { getCredential } from '../_shared/secrets.ts';
+
+// ── Inlined credential decryption (from _shared/crypto.ts + _shared/secrets.ts) ──
+// This avoids the _shared import that breaks dashboard deploys.
+
+const ENCRYPTED_PREFIX = 'enc:v1:';
+
+function isEncrypted(credential: string | null | undefined): boolean {
+  if (!credential) return false;
+  return credential.startsWith(ENCRYPTED_PREFIX);
+}
+
+async function decryptCredential(encrypted: string): Promise<string> {
+  if (!encrypted) throw new Error('Cannot decrypt empty credential');
+
+  // Handle plaintext credentials (backward compatibility)
+  if (!isEncrypted(encrypted)) {
+    return encrypted;
+  }
+
+  const masterKey = Deno.env.get('MASTER_ENCRYPTION_KEY');
+  if (!masterKey) throw new Error('MASTER_ENCRYPTION_KEY not set');
+
+  const keyBytes = Uint8Array.from(atob(masterKey), (c) => c.charCodeAt(0));
+  if (keyBytes.length < 32) throw new Error('MASTER_ENCRYPTION_KEY must be at least 32 bytes');
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyBytes.slice(0, 32),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  );
+
+  const withoutPrefix = encrypted.slice(ENCRYPTED_PREFIX.length);
+  const [ivBase64, ciphertextBase64] = withoutPrefix.split(':');
+
+  if (!ivBase64 || !ciphertextBase64) throw new Error('Invalid encrypted credential format');
+
+  const iv = Uint8Array.from(atob(ivBase64), (c) => c.charCodeAt(0));
+  const ciphertext = Uint8Array.from(atob(ciphertextBase64), (c) => c.charCodeAt(0));
+
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, tagLength: 128 },
+    key,
+    ciphertext
+  );
+
+  return new TextDecoder().decode(decryptedBuffer);
+}
+
+async function getCredential(tenantId: string, channel: string): Promise<string | null> {
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  const columnMap: Record<string, string> = {
+    whatsapp: 'whatsapp_credential',
+    calls: 'calls_credential',
+    conversations: 'conversations_credential',
+  };
+
+  const columnName = columnMap[channel];
+  if (!columnName) return null;
+
+  const { data: creds, error } = await supabaseAdmin
+    .from('tenant_credentials')
+    .select('whatsapp_credential, calls_credential, conversations_credential')
+    .eq('tenant_id', tenantId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // No rows found
+    console.error('[Secrets] Failed to fetch credential:', error);
+    return null;
+  }
+
+  if (!creds) return null;
+
+  const encryptedValue = (creds as Record<string, any>)[columnName];
+  if (!encryptedValue) return null;
+
+  try {
+    return await decryptCredential(encryptedValue);
+  } catch (err) {
+    console.error('[Secrets] Failed to decrypt credential:', err);
+    return null;
+  }
+}
+
+// ── End inlined credential logic ──
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,17 +146,20 @@ serve(async (req) => {
       });
     }
 
-    // 2. Fetch conversation with contact details (same structure as send-conversation-message)
+    // 2. Fetch conversation with contact details
+    // UPDATED: Using crm_contacts with current field names (nombre, numero)
+    // REMOVED: org_clinics join (table no longer exists)
     const { data: conversation, error: convError } = await supabaseClient
       .from("conversations")
-      .select(
-        `
+      .select(`
         *,
         contact:crm_contacts!conversations_contact_id_fkey (
-          id, nombre, numero, attributes
+          id,
+          nombre,
+          numero,
+          attributes
         )
-      `,
-      )
+      `)
       .eq("id", conversation_id)
       .single();
 
@@ -78,10 +171,10 @@ serve(async (req) => {
       });
     }
 
-    // 3. Fetch tenant settings for WhatsApp webhook
+    // 3. Fetch tenant settings — use the CONVERSATIONS webhook (same as send-conversation-message)
     const { data: tenantSettings, error: tenantError } = await supabaseClient
       .from('tenant_settings')
-      .select('whatsapp_enabled, whatsapp_webhook_url')
+      .select('conversations_enabled, conversations_webhook_url')
       .eq('tenant_id', conversation.tenant_id)
       .single();
 
@@ -101,45 +194,45 @@ serve(async (req) => {
       );
     }
 
-    if (!tenantSettings.whatsapp_enabled) {
-      console.error('[Template Webhook] WhatsApp channel not enabled');
+    if (!tenantSettings.conversations_enabled) {
+      console.error('[Template Webhook] Conversations channel not enabled');
       await supabaseClient
         .from('conversation_messages')
         .update({
           delivery_status: 'failed',
-          error_message: 'WhatsApp channel not enabled'
+          error_message: 'Conversations channel not enabled'
         })
         .eq('id', message_id);
 
       return new Response(
-        JSON.stringify({ error: 'WhatsApp channel not enabled' }),
+        JSON.stringify({ error: 'Conversations channel not enabled' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!tenantSettings.whatsapp_webhook_url) {
-      console.error('[Template Webhook] WhatsApp webhook URL not configured');
+    if (!tenantSettings.conversations_webhook_url) {
+      console.error('[Template Webhook] Conversations webhook URL not configured');
       await supabaseClient
         .from('conversation_messages')
         .update({
           delivery_status: 'failed',
-          error_message: 'WhatsApp webhook URL not configured'
+          error_message: 'Conversations webhook URL not configured'
         })
         .eq('id', message_id);
 
       return new Response(
-        JSON.stringify({ error: 'WhatsApp webhook URL not configured' }),
+        JSON.stringify({ error: 'Conversations webhook URL not configured' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const WHATSAPP_WEBHOOK_URL = tenantSettings.whatsapp_webhook_url;
-    console.log(`[Template Webhook] Using tenant WhatsApp webhook: ${WHATSAPP_WEBHOOK_URL}`);
+    const WEBHOOK_URL = tenantSettings.conversations_webhook_url;
+    console.log(`[Template Webhook] Using conversations webhook: ${WEBHOOK_URL}`);
 
-    // Fetch WhatsApp credential
-    const WEBHOOK_API_KEY = await getCredential(conversation.tenant_id, 'whatsapp');
+    // Fetch conversations credential (same as send-conversation-message)
+    const WEBHOOK_API_KEY = await getCredential(conversation.tenant_id, 'conversations');
     if (!WEBHOOK_API_KEY) {
-      console.warn('[Template Webhook] No WhatsApp credential configured, proceeding without auth');
+      console.warn('[Template Webhook] No conversations credential configured, proceeding without auth');
     }
 
     // 4. Fetch template details
@@ -157,37 +250,36 @@ serve(async (req) => {
       });
     }
 
-    // 4. Fetch account details
+    // 5. Fetch tenant details (UPDATED: uses 'tenants' table instead of 'org_accounts')
     let accountData = null;
-    if (conversation.account_id) {
-      const { data: account } = await supabaseClient
-        .from("org_accounts")
+    if (conversation.tenant_id) {
+      const { data: tenant } = await supabaseClient
+        .from("tenants")
         .select("id, name")
-        .eq("id", conversation.account_id)
+        .eq("id", conversation.tenant_id)
         .single();
-      accountData = account;
+      accountData = tenant;
     }
 
-    // 5. Fetch sender (agent) details
+    // 6. Fetch sender (agent) details (UPDATED: uses 'profiles' table instead of 'user_profiles')
     let senderData = null;
     if (message.sender_id) {
       const { data: profile } = await supabaseClient
-        .from("user_profiles")
-        .select("user_id, full_name")
-        .eq("user_id", message.sender_id)
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("id", message.sender_id)
         .single();
 
       if (profile) {
-        const { data: user } = await supabaseClient.auth.admin.getUserById(message.sender_id);
         senderData = {
-          id: profile.user_id,
+          id: profile.id,
           full_name: profile.full_name,
-          email: user.user?.email || null,
+          email: profile.email,
         };
       }
     }
 
-    // 6. Validate contact has phone for WhatsApp
+    // 7. Validate contact has phone for WhatsApp (UPDATED: uses 'numero' instead of 'phone')
     if (!conversation.contact?.numero) {
       console.error("[Template Webhook] Contact missing phone for WhatsApp template");
       await supabaseClient
@@ -204,34 +296,10 @@ serve(async (req) => {
       });
     }
 
-    // 7. Build webhook payload (same structure as send-conversation-message + template data)
+    // 8. Build webhook payload (UPDATED: uses 'nombre'/'numero' instead of 'name'/'phone')
     const webhookPayload = {
       event: "template_message_sent",
       timestamp: new Date().toISOString(),
-
-      // -- n8n Campaign Fallback Support -- 
-      // The local n8n workflow expects 'contacts' as an array and 'config' with phone_number_id
-      contacts: conversation.contact ? [
-        {
-          id: conversation.id, // n8n uses id from 'Gestionar Contacto' assuming it's the conversation.id
-          numero: conversation.contact.numero,
-          nombre: conversation.contact.nombre,
-          attributes: conversation.contact.attributes,
-          variables: template_variables || {},
-          resolved_variables: Object.entries(template_variables || {}).map(([key, value]) => ({
-            position: key,
-            value: value
-          }))
-        }
-      ] : [],
-      config: {
-        template_id: template.template_id,
-        template_name: template.name,
-        language: template.language,
-        phone_number_id: phone_number_id || conversation.whatsapp_number_id || null,
-      },
-      // ------------------------------------
-
       message: {
         id: message.id,
         content: message.content,
@@ -283,20 +351,20 @@ serve(async (req) => {
       tenant: conversation.tenant_id
         ? {
           id: conversation.tenant_id,
-          tenant_id: conversation.tenant_id, // Added tenant_id for n8n filter
+          tenant_id: conversation.tenant_id,
         }
         : null,
     };
 
-    console.log("[Template Webhook] Sending payload to external service:", WHATSAPP_WEBHOOK_URL);
+    console.log("[Template Webhook] Sending payload to external service:", WEBHOOK_URL);
 
-    // 8. Send POST to external webhook with retry (same retry logic as send-conversation-message)
+    // 9. Send POST to external webhook with retry (same retry logic as send-conversation-message)
     let lastError = null;
     const maxRetries = 3;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const webhookResponse = await fetch(WHATSAPP_WEBHOOK_URL, {
+        const webhookResponse = await fetch(WEBHOOK_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -342,7 +410,7 @@ serve(async (req) => {
               delivery_status: "sent",
               external_message_id: whatsappMessageId,
               metadata: {
-                ...message.metadata,
+                ...(typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {}),
                 webhook_sent_at: new Date().toISOString(),
                 external_response: responseData,
                 whatsapp_message_id: whatsappMessageId,
@@ -388,7 +456,7 @@ serve(async (req) => {
         delivery_status: "failed",
         error_message: lastError,
         metadata: {
-          ...message.metadata,
+          ...(typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {}),
           error: lastError,
           failed_at: new Date().toISOString(),
         },
@@ -404,19 +472,21 @@ serve(async (req) => {
 
     // Try to update message status to failed
     try {
-      const { message_id } = await req.json();
-      const supabaseClient = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      );
-
-      await supabaseClient
-        .from("conversation_messages")
-        .update({
-          delivery_status: "failed",
-          error_message: error instanceof Error ? error.message : String(error),
-        })
-        .eq("id", message_id);
+      const clonedReq = req.clone();
+      const body = await clonedReq.json().catch(() => ({}));
+      if (body.message_id) {
+        const supabaseAdmin = createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        );
+        await supabaseAdmin
+          .from("conversation_messages")
+          .update({
+            delivery_status: "failed",
+            error_message: error instanceof Error ? error.message : String(error),
+          })
+          .eq("id", body.message_id);
+      }
     } catch (updateError) {
       console.error("[Template Webhook] Failed to update message status:", updateError);
     }
