@@ -261,27 +261,8 @@ export function WizardStep4({
               </div>
             )}
 
-            {/* Template Preview (only when no variables) */}
-            {state.selectedTemplate && !hasTemplateVariables && (
-              <Card className="p-3 bg-background">
-                <div className="flex items-start gap-2 mb-2">
-                  <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <span className="text-sm font-medium">Vista previa de la plantilla</span>
-                </div>
-                <div className="space-y-1 text-sm">
-                  {state.selectedTemplate.headerText && (
-                    <p className="font-semibold">{state.selectedTemplate.headerText}</p>
-                  )}
-                  <p className="whitespace-pre-wrap">{state.selectedTemplate.bodyText}</p>
-                  {state.selectedTemplate.footerText && (
-                    <p className="text-xs text-muted-foreground">{state.selectedTemplate.footerText}</p>
-                  )}
-                </div>
-              </Card>
-            )}
-
-            {/* Variable Mapper (when template has variables) */}
-            {state.selectedTemplate && hasTemplateVariables && (() => {
+            {/* Template Variable Mapper and Preview */}
+            {state.selectedTemplate && (() => {
                // Extract the first contact for preview from import data
                let previewContact: any = null;
                
@@ -309,7 +290,9 @@ export function WizardStep4({
                     variables={state.selectedTemplate.variables}
                     customFields={customFields}
                     mapping={state.variableMapping}
+                    headerText={state.selectedTemplate.headerText}
                     bodyText={state.selectedTemplate.bodyText}
+                    footerText={state.selectedTemplate.footerText}
                     onMappingChange={onVariableMappingChange}
                     previewContact={previewContact}
                   />

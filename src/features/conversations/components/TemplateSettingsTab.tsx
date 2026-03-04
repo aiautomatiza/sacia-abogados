@@ -175,22 +175,18 @@ export function TemplateSettingsTab() {
                 </Button>
               </div>
 
-              {selectedTemplate.variables && selectedTemplate.variables.length > 0 ? (
-                <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
-                  <TemplateVariableMapper
-                    variables={selectedTemplate.variables}
-                    customFields={customFields}
-                    // @ts-ignore - The structure is identical but imported from different files
-                    mapping={mappings}
-                    bodyText={selectedTemplate.body_text}
-                    onMappingChange={setMappings}
-                  />
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
-                  <p>Esta plantilla no tiene variables configurables.</p>
-                </div>
-              )}
+              <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
+                <TemplateVariableMapper
+                  variables={selectedTemplate.variables || []}
+                  customFields={customFields}
+                  // @ts-ignore - The structure is identical but imported from different files
+                  mapping={mappings}
+                  headerText={selectedTemplate.header_text}
+                  bodyText={selectedTemplate.body_text}
+                  footerText={selectedTemplate.footer_text}
+                  onMappingChange={setMappings}
+                />
+              </div>
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground pt-12">

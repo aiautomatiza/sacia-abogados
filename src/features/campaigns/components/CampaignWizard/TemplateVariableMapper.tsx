@@ -27,6 +27,8 @@ interface TemplateVariableMapperProps {
   customFields: CustomField[];
   mapping: TemplateVariableMapping[];
   bodyText: string;
+  headerText?: string | null;
+  footerText?: string | null;
   onMappingChange: (mapping: TemplateVariableMapping[]) => void;
   previewContact?: any; // Add optional contact data for accurate previews
 }
@@ -49,6 +51,8 @@ export function TemplateVariableMapper({
   customFields,
   mapping,
   bodyText,
+  headerText,
+  footerText,
   onMappingChange,
   previewContact,
 }: TemplateVariableMapperProps) {
@@ -145,64 +149,73 @@ export function TemplateVariableMapper({
   };
 
   // Generate preview text by replacing variables with example values or real contact data
-  const previewText = useMemo(() => {
-    let text = bodyText;
+  const { previewHeader, previewBody, previewFooter } = useMemo(() => {
+    const replaceVars = (text: string | null | undefined) => {
+      if (!text) return text;
+      let result = text;
 
-    sortedVariables.forEach((variable) => {
-      const m = mapping.find((item) => item.position === variable.position);
-      let value = `{{${variable.position}}}`;
+      sortedVariables.forEach((variable) => {
+        const m = mapping.find((item) => item.position === variable.position);
+        let value = `{{${variable.position}}}`;
 
-      if (m) {
-        switch (m.source.type) {
-          case 'fixed_field':
-            if (previewContact && m.source.field === 'numero') {
-              value = previewContact.numero || EXAMPLE_VALUES['numero'];
-            } else if (previewContact && m.source.field === 'nombre') {
-              value = previewContact.nombre || EXAMPLE_VALUES['nombre'];
-            } else {
-               value = EXAMPLE_VALUES[m.source.field] || `[${m.source.field}]`;
+        if (m) {
+          switch (m.source.type) {
+            case 'fixed_field':
+              if (previewContact && m.source.field === 'numero') {
+                value = previewContact.numero || EXAMPLE_VALUES['numero'];
+              } else if (previewContact && m.source.field === 'nombre') {
+                value = previewContact.nombre || EXAMPLE_VALUES['nombre'];
+              } else {
+                 value = EXAMPLE_VALUES[m.source.field] || `[${m.source.field}]`;
+              }
+              break;
+              
+          case 'custom_field': {
+              const source = m.source as { type: 'custom_field'; fieldName: string };
+              const field = customFields.find((f) => f.field_name === source.fieldName);
+              if (previewContact && previewContact.attributes && source.fieldName) {
+                 // Extract real data if we have it
+                 let attributes = previewContact.attributes;
+                 if (typeof attributes === 'string') {
+                   try { attributes = JSON.parse(attributes); } catch { attributes = {}; }
+                 }
+                 
+                 let contactVal = undefined;
+                 if (attributes[source.fieldName] !== undefined) {
+                   contactVal = attributes[source.fieldName];
+                 } else {
+                   const matchKey = Object.keys(attributes).find(k => k.toLowerCase() === source.fieldName!.toLowerCase());
+                   if (matchKey) contactVal = attributes[matchKey];
+                 }
+                 
+                 if (contactVal !== undefined && contactVal !== "") {
+                    value = String(contactVal);
+                 } else {
+                    value = field ? `[${field.field_label}]` : `[${source.fieldName}]`;
+                 }
+              } else {
+                 value = field ? `[${field.field_label}]` : `[${source.fieldName}]`;
+              }
+              break;
             }
-            break;
-            
-        case 'custom_field': {
-            const source = m.source as { type: 'custom_field'; fieldName: string };
-            const field = customFields.find((f) => f.field_name === source.fieldName);
-            if (previewContact && previewContact.attributes && source.fieldName) {
-               // Extract real data if we have it
-               let attributes = previewContact.attributes;
-               if (typeof attributes === 'string') {
-                 try { attributes = JSON.parse(attributes); } catch { attributes = {}; }
-               }
-               
-               let contactVal = undefined;
-               if (attributes[source.fieldName] !== undefined) {
-                 contactVal = attributes[source.fieldName];
-               } else {
-                 const matchKey = Object.keys(attributes).find(k => k.toLowerCase() === source.fieldName!.toLowerCase());
-                 if (matchKey) contactVal = attributes[matchKey];
-               }
-               
-               if (contactVal !== undefined && contactVal !== "") {
-                  value = String(contactVal);
-               } else {
-                  value = field ? `[${field.field_label}]` : `[${source.fieldName}]`;
-               }
-            } else {
-               value = field ? `[${field.field_label}]` : `[${source.fieldName}]`;
-            }
-            break;
+            case 'static_value':
+              value = m.source.value || `{{${variable.position}}}`;
+              break;
           }
-          case 'static_value':
-            value = m.source.value || `{{${variable.position}}}`;
-            break;
         }
-      }
 
-      text = text.replace(`{{${variable.position}}}`, value);
-    });
+        result = result.replace(`{{${variable.position}}}`, value);
+      });
 
-    return text;
-  }, [bodyText, sortedVariables, mapping, customFields, previewContact]);
+      return result;
+    };
+
+    return {
+      previewHeader: replaceVars(headerText),
+      previewBody: replaceVars(bodyText),
+      previewFooter: replaceVars(footerText),
+    };
+  }, [bodyText, headerText, footerText, sortedVariables, mapping, customFields, previewContact]);
 
   // Check if all variables are mapped
   const unmappedVariables = sortedVariables.filter((v) => {
@@ -213,13 +226,12 @@ export function TemplateVariableMapper({
     return false;
   });
 
-  if (sortedVariables.length === 0) {
-    return null;
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
+      {/* Variable Mappers (only if template has variables) */}
+      {sortedVariables.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 text-sm font-medium">
         <Variable className="h-4 w-4" />
         <span>Configurar variables de la plantilla</span>
       </div>
@@ -356,14 +368,24 @@ export function TemplateVariableMapper({
           </div>
         </div>
       )}
+      </>
+      )}
 
       {/* Preview */}
       <Card className="p-3 bg-muted/30">
         <div className="flex items-start gap-2 mb-2">
           <span className="text-sm font-medium">Vista previa del mensaje</span>
         </div>
-        <p className="text-sm whitespace-pre-wrap">{previewText}</p>
-        <p className="text-xs text-muted-foreground mt-2">
+        <div className="space-y-1 text-sm">
+          {previewHeader && (
+            <p className="font-semibold whitespace-pre-wrap">{previewHeader}</p>
+          )}
+          <p className="whitespace-pre-wrap">{previewBody}</p>
+          {previewFooter && (
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap">{previewFooter}</p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
           Los valores entre corchetes [ ] se reemplazaran con los datos reales de cada contacto.
         </p>
       </Card>
