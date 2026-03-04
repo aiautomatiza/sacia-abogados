@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { getTemplateMappings, type WhatsAppTemplateRow } from "../services/whatsapp-templates.service";
 import { useWhatsAppTemplatesForConversation } from "../hooks/useWhatsAppTemplates";
 import type { ConversationWithContact } from "../types";
@@ -48,11 +49,35 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
   const { data: templates = [], isLoading } = useWhatsAppTemplatesForConversation(conversationId);
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [variableValues, setVariableValues] = React.useState<Record<string, string>>({});
+  const [contactWithLocation, setContactWithLocation] = React.useState(contact);
+
+  // Fetch location details if missing but location_id exists
+  React.useEffect(() => {
+    async function fetchLocation() {
+      if (contact?.location_id && !contact.location) {
+        const { data: locationData } = await supabase
+          .from('tenant_locations')
+          .select('*')
+          .eq('id', contact.location_id)
+          .single();
+        
+        if (locationData) {
+          setContactWithLocation({
+            ...contact,
+            location: locationData
+          });
+        }
+      } else {
+        setContactWithLocation(contact);
+      }
+    }
+    fetchLocation();
+  }, [contact]);
 
   // Effect to load and apply variable mappings when a template is selected
   React.useEffect(() => {
     async function loadAndApplyMappings() {
-      if (!currentTenant?.id || !selectedTemplateId || !contact) {
+      if (!currentTenant?.id || !selectedTemplateId || !contactWithLocation) {
         // Only clear if we explicitly changed templates to null or another that hasn't loaded
         // Keep existing manual values while the new template is being selected/mapped manually
         return; 
@@ -80,13 +105,22 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
               value = source.value || "";
             } else if (source.type === 'fixed_field') {
               if (source.field === 'nombre') {
-                value = contact.nombre || "";
+                value = contactWithLocation.nombre || "";
               } else if (source.field === 'numero') {
-                value = contact.numero || "";
+                value = contactWithLocation.numero || "";
+              }
+            } else if ((source as any).type === 'location_field') {
+              // Extract from contact's location if available
+              const field = (source as any).field;
+              const location = contactWithLocation.location;
+              if (location && location[field]) {
+                value = String(location[field]);
+              } else {
+                value = ""; // Or some placeholder
               }
             } else if (source.type === 'custom_field' && source.fieldName) {
               // Extract from attributes (custom fields)
-              let attributes = contact.attributes as any;
+              let attributes = contactWithLocation.attributes as any;
               if (typeof attributes === 'string') {
                 try {
                   attributes = JSON.parse(attributes);
@@ -128,7 +162,7 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     }
 
     loadAndApplyMappings();
-  }, [selectedTemplateId, currentTenant?.id, contact]);
+  }, [selectedTemplateId, currentTenant?.id, contactWithLocation]);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
@@ -159,7 +193,11 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     // Helper: detect which component a given position belongs to
     const detectComponent = (pos: number): "HEADER" | "BODY" | "FOOTER" => {
       const placeholder = `{{${pos}}}`;
+      // CRITICAL: We need to know which occurrences we are looking for.
+      // If the same index exists in multiple components, this helper is ambiguous.
+      // But for display purposes, we check in order:
       if (selectedTemplate.header_text?.includes(placeholder)) return "HEADER";
+      if (selectedTemplate.body_text?.includes(placeholder)) return "BODY";
       if (selectedTemplate.footer_text?.includes(placeholder)) return "FOOTER";
       return "BODY";
     };
@@ -174,11 +212,16 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     }
 
     // Si no, extraer del texto (manteniendo separadas por componente)
-    return [
+    const vars = [
       ...extractVariablesFromText(selectedTemplate.header_text, "HEADER"),
       ...extractVariablesFromText(selectedTemplate.body_text, "BODY"),
       ...extractVariablesFromText(selectedTemplate.footer_text, "FOOTER"),
     ];
+
+    // De-duplicate by both component and position
+    return vars.filter((v, index, self) => 
+      index === self.findIndex((t) => t.position === v.position && t.component === v.component)
+    );
   };
 
   const templateVariables = getTemplateVariables();

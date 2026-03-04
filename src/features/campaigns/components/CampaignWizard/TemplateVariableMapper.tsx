@@ -34,17 +34,28 @@ interface TemplateVariableMapperProps {
   previewContact?: any; // Add optional contact data for accurate previews
 }
 
-type SourceType = 'fixed_field' | 'custom_field' | 'static_value';
+type SourceType = 'fixed_field' | 'custom_field' | 'location_field' | 'static_value';
 
 const FIXED_FIELDS = [
   { value: 'nombre', label: 'Nombre del contacto' },
   { value: 'numero', label: 'Numero de telefono' },
 ] as const;
 
+const LOCATION_FIELDS = [
+  { value: 'name', label: 'Nombre de la sede' },
+  { value: 'address_line1', label: 'Dirección' },
+  { value: 'city', label: 'Ciudad' },
+  { value: 'phone', label: 'Teléfono de sede' },
+  { value: 'email', label: 'Email de sede' },
+  { value: 'code', label: 'Código de sede' },
+] as const;
+
 // Example values for preview
 const EXAMPLE_VALUES: Record<string, string> = {
   nombre: 'Juan Perez',
-  numero: '+52 55 1234 5678',
+  numero: '+34 600 000 000',
+  location_name: 'Sede Central',
+  location_city: 'Madrid',
 };
 
 export function TemplateVariableMapper({
@@ -97,6 +108,8 @@ export function TemplateVariableMapper({
         return m.source.field;
       case 'custom_field':
         return m.source.fieldName;
+      case 'location_field':
+        return (m.source as any).field || '';
       case 'static_value':
         return m.source.value;
       default:
@@ -116,6 +129,9 @@ export function TemplateVariableMapper({
         break;
       case 'custom_field':
         source = { type: 'custom_field', fieldName: customFields[0]?.field_name || '' };
+        break;
+      case 'location_field':
+        source = { type: 'location_field', field: 'name' } as any;
         break;
       case 'static_value':
         source = { type: 'static_value', value: '' };
@@ -146,6 +162,9 @@ export function TemplateVariableMapper({
         break;
       case 'custom_field':
         source = { type: 'custom_field', fieldName: value };
+        break;
+      case 'location_field':
+        source = { type: 'location_field', field: value as any };
         break;
       case 'static_value':
         source = { type: 'static_value', value };
@@ -220,6 +239,16 @@ export function TemplateVariableMapper({
             case 'static_value':
               value = m.source.value || `{{${variable.position}}}`;
               break;
+            case 'location_field' as any: {
+              const field = (m.source as any).field;
+              if (previewContact?.location && previewContact.location[field]) {
+                value = String(previewContact.location[field]);
+              } else {
+                const label = LOCATION_FIELDS.find(f => f.value === field)?.label || field;
+                value = `[${label}]`;
+              }
+              break;
+            }
           }
         }
 
@@ -302,6 +331,12 @@ export function TemplateVariableMapper({
                         Campo personalizado
                       </div>
                     </SelectItem>
+                    <SelectItem value="location_field">
+                      <div className="flex items-center gap-2">
+                        <Type className="h-3.5 w-3.5" />
+                        Campo Sede
+                      </div>
+                    </SelectItem>
                     <SelectItem value="static_value">
                       <div className="flex items-center gap-2">
                         <Type className="h-3.5 w-3.5" />
@@ -349,6 +384,26 @@ export function TemplateVariableMapper({
                       {customFields.map((field) => (
                         <SelectItem key={field.field_name} value={field.field_name}>
                           {field.field_label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {getSourceType(variable.position, variable.component) === 'location_field' && (
+                  <Select
+                    value={getSourceValue(variable.position, variable.component)}
+                    onValueChange={(value) =>
+                      handleSourceValueChange(variable.position, variable.component, variable.name, value)
+                    }
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Seleccionar atributo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LOCATION_FIELDS.map((field) => (
+                        <SelectItem key={field.value} value={field.value}>
+                          {field.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

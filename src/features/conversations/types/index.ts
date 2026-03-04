@@ -29,6 +29,8 @@ export interface Contact {
   attributes: Record<string, any> | null;
   status_id: string | null;
   status: ContactStatus | null;
+  location_id: string | null;
+  location?: any | null;
 }
 
 // WhatsApp number configuration

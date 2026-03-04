@@ -40,24 +40,37 @@ export function TemplateSettingsTab() {
 
       const extractVars = (text: string | null, component: 'HEADER' | 'BODY' | 'FOOTER') => {
         if (!text) return [];
-        const matches = text.match(/\{\{(\d+)\}\}/g);
-        if (!matches) return [];
-        const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
-        return positions.sort((a, b) => a - b).map(pos => ({
-          name: `Variable ${component} ${pos}`,
+        const matches = [...text.matchAll(/\{\{(\d+)\}\}/g)];
+        if (!matches.length) return [];
+        
+        // Map to unique positions for THIS component
+        const positions = [...new Set(matches.map(m => parseInt(m[1])))].sort((a, b) => a - b);
+        
+        return positions.map(pos => ({
+          name: `Variable ${pos}`,
           position: pos,
           component
         }));
       };
 
-      // Parse variables per component: if stored in DB use detectComponent when missing
-      let variables = Array.isArray(template.variables) && template.variables.length > 0
-        ? template.variables.map((v: any) => ({
-            name: v.name || '',
-            position: v.position || 0,
-            component: v.component || detectComponent(v.position || 0),
-          }))
-        : [];
+      // Parse variables: Merge DB variables with extracted ones to ensure all are present
+      // and correctly assigned to their components.
+      const extractedVars = [
+        ...extractVars(template.header_text, 'HEADER'),
+        ...extractVars(template.body_text, 'BODY'),
+        ...extractVars(template.footer_text, 'FOOTER'),
+      ];
+
+      const dbVars = Array.isArray(template.variables) ? template.variables : [];
+      
+      // Map extracted vars, but prefer names from DB if position matches
+      let variables = extractedVars.map(ev => {
+        const dbV = dbVars.find((v: any) => v.position === ev.position && (v.component === ev.component || !v.component));
+        return {
+          ...ev,
+          name: dbV?.name || ev.name
+        };
+      });
 
       // If no variables in the field, extract from texts
       if (variables.length === 0) {

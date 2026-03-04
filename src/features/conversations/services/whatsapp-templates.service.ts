@@ -44,8 +44,8 @@ export type TemplateVariableMapping = {
   component: TemplateComponentType;
   variableName: string;
   source: {
-    type: 'fixed_field' | 'custom_field' | 'static_value';
-    field?: 'nombre' | 'numero';
+    type: 'fixed_field' | 'custom_field' | 'location_field' | 'static_value';
+    field?: 'nombre' | 'numero' | 'name' | 'address_line1' | 'city' | 'phone' | 'email' | 'code';
     fieldName?: string;
     value?: string;
   };

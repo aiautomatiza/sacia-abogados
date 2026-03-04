@@ -162,6 +162,7 @@ export const listConversations = async ({
         numero,
         attributes,
         status_id,
+        location_id,
         status:crm_contact_statuses!crm_contacts_status_id_fkey (
           id,
           name,
@@ -300,6 +301,7 @@ export const getConversationByContactId = async (
         numero,
         attributes,
         status_id,
+        location_id,
         status:crm_contact_statuses!crm_contacts_status_id_fkey (
           id,
           name,
@@ -347,6 +349,7 @@ export const getConversationById = async (
         numero,
         attributes,
         status_id,
+        location_id,
         status:crm_contact_statuses!crm_contacts_status_id_fkey (
           id,
           name,
@@ -505,6 +508,7 @@ export const createConversation = async (
         numero,
         attributes,
         status_id,
+        location_id,
         status:crm_contact_statuses!crm_contacts_status_id_fkey (
           id,
           name,
@@ -546,6 +550,7 @@ export const createConversation = async (
         numero,
         attributes,
         status_id,
+        location_id,
         status:crm_contact_statuses!crm_contacts_status_id_fkey (
           id,
           name,

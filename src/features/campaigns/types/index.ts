@@ -89,10 +89,13 @@ export interface CampaignValidation {
   contactCount: number;
 }
 
+export type LocationField = 'name' | 'address_line1' | 'city' | 'phone' | 'email' | 'code';
+
 // Template variable mapping types
 export type TemplateVariableSource =
   | { type: 'fixed_field'; field: 'numero' | 'nombre' }
   | { type: 'custom_field'; fieldName: string }
+  | { type: 'location_field'; field: LocationField }
   | { type: 'static_value'; value: string };
 
 export type TemplateComponentType = 'HEADER' | 'BODY' | 'FOOTER';

@@ -22,12 +22,13 @@ interface VariableMapping {
   source:
   | { type: 'fixed_field'; field: 'numero' | 'nombre' }
   | { type: 'custom_field'; fieldName: string }
+  | { type: 'location_field'; field: string }
   | { type: 'static_value'; value: string };
 }
 
 // Resolve a single mapping source to a string value for a contact
 function resolveSourceValue(
-  contact: { numero: string; nombre: string | null; attributes: Record<string, any> },
+  contact: { numero: string; nombre: string | null; attributes: Record<string, any>; location?: any },
   source: VariableMapping['source']
 ): string {
   switch (source.type) {
@@ -53,6 +54,14 @@ function resolveSourceValue(
       return '';
     }
 
+    case 'location_field': {
+      if (contact.location && (source as any).field) {
+        const field = (source as any).field;
+        return contact.location[field] ? String(contact.location[field]) : '';
+      }
+      return '';
+    }
+
     case 'static_value':
       return source.value || '';
 
@@ -64,7 +73,7 @@ function resolveSourceValue(
 // Resolve variables for a single contact based on the mapping.
 // Returns an object with parameters grouped by component for Meta API.
 function resolveVariablesForContact(
-  contact: { numero: string; nombre: string | null; attributes: Record<string, any> },
+  contact: { numero: string; nombre: string | null; attributes: Record<string, any>; location?: any },
   variableMapping: VariableMapping[]
 ): {
   header_parameters: Array<{ type: string; text: string }>;
@@ -116,7 +125,7 @@ async function fetchContactsInBatches(
 
     const { data: batchContacts, error } = await supabaseClient
       .from('crm_contacts')
-      .select('id, numero, nombre, attributes')
+      .select('id, numero, nombre, attributes, location_id')
       .in('id', batch)
       .eq('tenant_id', tenantId);
 
@@ -259,9 +268,32 @@ Deno.serve(async (req) => {
     // Resolve variables for each contact if mapping exists (WhatsApp campaigns)
     if (channel === 'whatsapp' && variable_mapping && variable_mapping.length > 0) {
       console.log(`Resolviendo ${variable_mapping.length} variables para ${contacts.length} contactos`);
+
+      // Fetch unique locations found in contacts
+      const locationIds = [...new Set(contacts.map(c => c.location_id).filter(Boolean))];
+      let locations: Record<string, any> = {};
+
+      if (locationIds.length > 0) {
+        const { data: locationsData } = await userClient
+          .from('tenant_locations')
+          .select('*')
+          .in('id', locationIds);
+
+        if (locationsData) {
+          locations = locationsData.reduce((acc: any, loc: any) => {
+            acc[loc.id] = loc;
+            return acc;
+          }, {});
+        }
+      }
+
       contacts = contacts.map((contact) => ({
         ...contact,
-        resolved_variables: resolveVariablesForContact(contact, variable_mapping),
+        location: contact.location_id ? locations[contact.location_id] : null,
+        resolved_variables: resolveVariablesForContact(
+          { ...contact, location: contact.location_id ? locations[contact.location_id] : null },
+          variable_mapping
+        ),
       }));
     }
 
