@@ -50,25 +50,38 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [variableValues, setVariableValues] = React.useState<Record<string, string>>({});
   const [contactWithLocation, setContactWithLocation] = React.useState(contact);
+  const [locationLoaded, setLocationLoaded] = React.useState(!contact?.location_id || !!contact?.location);
 
   // Fetch location details if missing but location_id exists
   React.useEffect(() => {
     async function fetchLocation() {
       if (contact?.location_id && !contact.location) {
-        const { data: locationData } = await supabase
-          .from('tenant_locations')
-          .select('*')
-          .eq('id', contact.location_id)
-          .single();
-        
-        if (locationData) {
-          setContactWithLocation({
-            ...contact,
-            location: locationData
-          });
+        setLocationLoaded(false);
+        try {
+          const { data: locationData, error } = await supabase
+            .from('tenant_locations')
+            .select('*')
+            .eq('id', contact.location_id)
+            .single();
+          
+          if (locationData && !error) {
+            setContactWithLocation({
+              ...contact,
+              location: locationData
+            });
+          } else {
+            console.warn('[TemplateSelector] Could not fetch location:', error?.message);
+            setContactWithLocation(contact);
+          }
+        } catch (err) {
+          console.error('[TemplateSelector] Error fetching location:', err);
+          setContactWithLocation(contact);
+        } finally {
+          setLocationLoaded(true);
         }
       } else {
         setContactWithLocation(contact);
+        setLocationLoaded(true);
       }
     }
     fetchLocation();
@@ -81,6 +94,13 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
         // Only clear if we explicitly changed templates to null or another that hasn't loaded
         // Keep existing manual values while the new template is being selected/mapped manually
         return; 
+      }
+
+      // Wait for location data to finish loading before resolving variables
+      // This prevents a race condition where location_field variables resolve as empty
+      if (!locationLoaded) {
+        console.log('[TemplateSelector] Waiting for location data to load before resolving variables...');
+        return; // Will re-run when locationLoaded changes to true
       }
 
       try {
@@ -162,7 +182,7 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     }
 
     loadAndApplyMappings();
-  }, [selectedTemplateId, currentTenant?.id, contactWithLocation]);
+  }, [selectedTemplateId, currentTenant?.id, contactWithLocation, locationLoaded]);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
