@@ -18,70 +18,85 @@ function chunkArray<T>(array: T[], size: number): T[][] {
 interface VariableMapping {
   position: number;
   variableName: string;
+  component?: 'HEADER' | 'BODY' | 'FOOTER'; // Optional for backward compatibility
   source:
   | { type: 'fixed_field'; field: 'numero' | 'nombre' }
   | { type: 'custom_field'; fieldName: string }
   | { type: 'static_value'; value: string };
 }
 
-// Resolve variables for a single contact based on the mapping
+// Resolve a single mapping source to a string value for a contact
+function resolveSourceValue(
+  contact: { numero: string; nombre: string | null; attributes: Record<string, any> },
+  source: VariableMapping['source']
+): string {
+  switch (source.type) {
+    case 'fixed_field':
+      if (source.field === 'numero') return contact.numero || '';
+      if (source.field === 'nombre') return contact.nombre || '';
+      return '';
+
+    case 'custom_field': {
+      let attributes: any = contact.attributes;
+      if (typeof attributes === 'string') {
+        try { attributes = JSON.parse(attributes); } catch { attributes = {}; }
+      }
+      if (attributes && source.fieldName) {
+        if (attributes[source.fieldName] !== undefined) {
+          return String(attributes[source.fieldName]);
+        }
+        const matchingKey = Object.keys(attributes).find(
+          k => k.toLowerCase() === source.fieldName.toLowerCase()
+        );
+        if (matchingKey) return String(attributes[matchingKey]);
+      }
+      return '';
+    }
+
+    case 'static_value':
+      return source.value || '';
+
+    default:
+      return '';
+  }
+}
+
+// Resolve variables for a single contact based on the mapping.
+// Returns an object with parameters grouped by component for Meta API.
 function resolveVariablesForContact(
   contact: { numero: string; nombre: string | null; attributes: Record<string, any> },
   variableMapping: VariableMapping[]
-): Array<{ position: number; value: string }> {
+): {
+  header_parameters: Array<{ type: string; text: string }>;
+  body_parameters: Array<{ type: string; text: string }>;
+  footer_parameters: Array<{ type: string; text: string }>;
+} {
   if (!variableMapping || variableMapping.length === 0) {
-    return [];
+    return { header_parameters: [], body_parameters: [], footer_parameters: [] };
   }
 
-  return variableMapping.map((mapping) => {
-    let value = '';
+  const header: Array<{ type: string; text: string }> = [];
+  const body: Array<{ type: string; text: string }> = [];
+  const footer: Array<{ type: string; text: string }> = [];
 
-    switch (mapping.source.type) {
-      case 'fixed_field':
-        if (mapping.source.field === 'numero') {
-          value = contact.numero || '';
-        } else if (mapping.source.field === 'nombre') {
-          value = contact.nombre || '';
-        }
-        break;
+  // Sort by position within each component
+  const sorted = [...variableMapping].sort((a, b) => a.position - b.position);
 
-      case 'custom_field': {
-        const source = mapping.source as { type: 'custom_field'; fieldName: string };
-        let attributes: any = contact.attributes;
-        if (typeof attributes === 'string') {
-          try {
-            attributes = JSON.parse(attributes);
-          } catch {
-            attributes = {};
-          }
-        }
+  for (const mapping of sorted) {
+    const value = resolveSourceValue(contact, mapping.source);
+    const param = { type: 'text', text: String(value) };
+    const component = mapping.component || 'BODY'; // Default to BODY for old data
 
-        if (attributes && source.fieldName) {
-          if (attributes[source.fieldName] !== undefined) {
-            value = attributes[source.fieldName];
-          } else {
-            const matchingKey = Object.keys(attributes).find(
-              k => k.toLowerCase() === source.fieldName.toLowerCase()
-            );
-            if (matchingKey) {
-              value = attributes[matchingKey];
-            }
-          }
-        }
-        value = value || '';
-        break;
-      }
+    if (component === 'HEADER') header.push(param);
+    else if (component === 'FOOTER') footer.push(param);
+    else body.push(param);
+  }
 
-      case 'static_value':
-        value = mapping.source.value || '';
-        break;
-    }
-
-    return {
-      position: mapping.position,
-      value: String(value),
-    };
-  }).sort((a, b) => a.position - b.position);
+  return {
+    header_parameters: header,
+    body_parameters: body,
+    footer_parameters: footer,
+  };
 }
 
 // Function to fetch contacts in batches

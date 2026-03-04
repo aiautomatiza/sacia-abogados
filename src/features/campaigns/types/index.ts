@@ -95,8 +95,11 @@ export type TemplateVariableSource =
   | { type: 'custom_field'; fieldName: string }
   | { type: 'static_value'; value: string };
 
+export type TemplateComponentType = 'HEADER' | 'BODY' | 'FOOTER';
+
 export interface TemplateVariableMapping {
   position: number;        // Position: 1, 2, 3...
+  component: TemplateComponentType; // Which component the variable belongs to
   variableName: string;    // Descriptive name (for UI)
   source: TemplateVariableSource;
 }
@@ -104,6 +107,7 @@ export interface TemplateVariableMapping {
 export interface TemplateVariable {
   name: string;
   position: number;
+  component: TemplateComponentType;
 }
 
 // WhatsApp template selection for campaigns

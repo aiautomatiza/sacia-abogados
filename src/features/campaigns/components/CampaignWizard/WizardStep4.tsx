@@ -101,24 +101,43 @@ export function WizardStep4({
   const handleTemplateChange = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
-      // Parse variables from template.variables field if available
+      // Helper: find which component a given position appears in (within the template texts)
+      const detectComponent = (pos: number): 'HEADER' | 'BODY' | 'FOOTER' => {
+        const placeholder = `{{${pos}}}`;
+        if (template.header_text?.includes(placeholder)) return 'HEADER';
+        if (template.footer_text?.includes(placeholder)) return 'FOOTER';
+        return 'BODY';
+      };
+
+      const extractVars = (text: string | null, component: 'HEADER' | 'BODY' | 'FOOTER') => {
+        if (!text) return [];
+        const matches = text.match(/\{\{(\d+)\}\}/g);
+        if (!matches) return [];
+        const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
+        return positions.sort((a, b) => a - b).map(pos => ({
+          name: `Variable ${component} ${pos}`,
+          position: pos,
+          component
+        }));
+      };
+
+      // Parse variables per component: if stored in DB, map with correct component detection
       let variables = Array.isArray(template.variables) && template.variables.length > 0
         ? template.variables.map((v: any) => ({
             name: v.name || '',
             position: v.position || 0,
+            // If component explicitly stored, use it; otherwise detect from text
+            component: v.component || detectComponent(v.position || 0),
           }))
         : [];
 
-      // If no variables in the field, extract from body_text (e.g., {{1}}, {{2}})
-      if (variables.length === 0 && template.body_text) {
-        const matches = template.body_text.match(/\{\{(\d+)\}\}/g);
-        if (matches) {
-          const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
-          variables = positions.sort((a, b) => a - b).map(pos => ({
-            name: `Variable ${pos}`,
-            position: pos,
-          }));
-        }
+      // If no variables in the field at all, extract from texts
+      if (variables.length === 0) {
+        variables = [
+          ...extractVars(template.header_text, 'HEADER'),
+          ...extractVars(template.body_text, 'BODY'),
+          ...extractVars(template.footer_text, 'FOOTER'),
+        ];
       }
 
       onTemplateSelect({

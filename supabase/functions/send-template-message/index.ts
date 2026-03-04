@@ -297,6 +297,39 @@ serve(async (req) => {
     }
 
     // 8. Build webhook payload (UPDATED: uses 'nombre'/'numero' instead of 'name'/'phone')
+    // Build component-aware parameter arrays from variable_values
+    // variable_values is keyed like "HEADER-1", "BODY-1", "FOOTER-1"
+    const buildComponentParameters = (
+      variables: any[],
+      variableValuesMap: Record<string, string>,
+      component: string
+    ) => {
+      if (!variables || !Array.isArray(variables)) return [];
+      const componentVars = variables
+        .filter((v: any) => (v.component || 'BODY') === component)
+        .sort((a: any, b: any) => a.position - b.position);
+      return componentVars.map((v: any) => ({
+        type: 'text',
+        text: variableValuesMap[`${component}-${v.position}`] || variableValuesMap[String(v.position)] || '',
+      }));
+    };
+
+    let tplVariables: any[] = [];
+    if (Array.isArray(template.variables)) {
+      tplVariables = template.variables;
+    } else if (template.variables && typeof template.variables === 'object' && 'items' in (template.variables as any)) {
+      tplVariables = (template.variables as any).items;
+    }
+
+    const varValues: Record<string, string> = template_variables || {};
+    const metaComponents = [];
+    const headerParams = buildComponentParameters(tplVariables, varValues, 'HEADER');
+    const bodyParams = buildComponentParameters(tplVariables, varValues, 'BODY');
+    const footerParams = buildComponentParameters(tplVariables, varValues, 'FOOTER');
+    if (headerParams.length > 0) metaComponents.push({ type: 'header', parameters: headerParams });
+    if (bodyParams.length > 0) metaComponents.push({ type: 'body', parameters: bodyParams });
+    if (footerParams.length > 0) metaComponents.push({ type: 'footer', parameters: footerParams });
+
     const webhookPayload = {
       event: "template_message_sent",
       timestamp: new Date().toISOString(),
@@ -318,6 +351,8 @@ serve(async (req) => {
         footer_text: template.footer_text,
         variables: template.variables,
         variable_values: template_variables || {},
+        // Meta API format: components with parameters grouped by section
+        components: metaComponents,
       },
       follow_up_message: follow_up_message || null,
       conversation: {

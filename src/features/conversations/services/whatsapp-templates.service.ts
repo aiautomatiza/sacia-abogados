@@ -14,9 +14,12 @@ export type WhatsAppTemplateMappingRow = Database["public"]["Tables"]["whatsapp_
 export type WhatsAppTemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
 export type WhatsAppTemplateStatus = "APPROVED" | "PENDING" | "REJECTED";
 
+export type TemplateComponentType = 'HEADER' | 'BODY' | 'FOOTER';
+
 export interface WhatsAppTemplateVariable {
   name: string;
   position: number;
+  component: TemplateComponentType;
 }
 
 export interface WhatsAppTemplate {
@@ -38,6 +41,7 @@ export interface WhatsAppTemplate {
 
 export type TemplateVariableMapping = {
   position: number;
+  component: TemplateComponentType;
   variableName: string;
   source: {
     type: 'fixed_field' | 'custom_field' | 'static_value';
@@ -48,7 +52,12 @@ export type TemplateVariableMapping = {
 };
 
 const parseVariables = (variables: any): WhatsAppTemplateVariable[] => {
-  if (Array.isArray(variables)) return variables as WhatsAppTemplateVariable[];
+  if (Array.isArray(variables)) {
+    return variables.map(v => ({
+      ...v,
+      component: v.component || 'BODY'
+    })) as WhatsAppTemplateVariable[];
+  }
 
   let parsed = variables;
   if (typeof variables === 'string') {
@@ -61,8 +70,21 @@ const parseVariables = (variables: any): WhatsAppTemplateVariable[] => {
   }
 
   if (parsed && typeof parsed === 'object') {
+    // Handle the new wrapper format: { items: [...] }
+    if ('items' in parsed && Array.isArray(parsed.items)) {
+      return parsed.items.map((v: any) => ({
+        ...v,
+        component: v.component || 'BODY'
+      })) as WhatsAppTemplateVariable[];
+    }
+
+    // Legacy object format: { "name": position }
     return Object.entries(parsed)
-      .map(([name, position]) => ({ name, position: Number(position) }))
+      .map(([name, position]) => ({
+        name,
+        position: Number(position),
+        component: 'BODY' as TemplateComponentType
+      }))
       .sort((a, b) => a.position - b.position);
   }
   return [];
@@ -71,7 +93,7 @@ const parseVariables = (variables: any): WhatsAppTemplateVariable[] => {
 /**
  * List WhatsApp templates for a tenant (using scope)
  */
-export const listTemplatesByScope = async (scope: UserScope | null): Promise<WhatsAppTemplateRow[]> => {
+export const listTemplatesByScope = async (scope: UserScope | null): Promise<WhatsAppTemplate[]> => {
   if (!scope) return [];
 
   const { data, error } = await supabase
@@ -86,7 +108,12 @@ export const listTemplatesByScope = async (scope: UserScope | null): Promise<Wha
     throw error;
   }
 
-  return data || [];
+  if (!data) return [];
+
+  return data.map(row => ({
+    ...row,
+    variables: parseVariables(row.variables)
+  })) as WhatsAppTemplate[];
 };
 
 /**
@@ -127,6 +154,7 @@ export const listTemplates = async (tenantId: string): Promise<WhatsAppTemplate[
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
     variables: parseVariables(template.variables),
+    waba_id: (template as any).waba_id || null,
   }));
 };
 
@@ -138,20 +166,20 @@ export const getTemplateById = async (id: string): Promise<WhatsAppTemplate | nu
     .from("whatsapp_templates")
     .select("*")
     .eq("id", id)
-    .maybeSingle();
+    .single();
 
   if (error) {
+    if (error.code === "PGRST116") return null; // No rows found
     console.error("Error getting WhatsApp template:", error);
     throw error;
   }
-
-  if (!data) return null;
 
   return {
     ...data,
     category: data.category as WhatsAppTemplateCategory,
     status: data.status as WhatsAppTemplateStatus,
     variables: parseVariables(data.variables),
+    waba_id: (data as any).waba_id || null,
   };
 };
 
@@ -187,6 +215,7 @@ export const listApprovedTemplates = async (tenantId: string): Promise<WhatsAppT
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
     variables: parseVariables(template.variables),
+    waba_id: (template as any).waba_id || null,
   }));
 };
 
@@ -224,6 +253,7 @@ export const createTemplate = async (
     category: data.category as WhatsAppTemplateCategory,
     status: data.status as WhatsAppTemplateStatus,
     variables: parseVariables(data.variables),
+    waba_id: (data as any).waba_id || null,
   };
 };
 
@@ -278,6 +308,7 @@ export const listTemplatesByWaba = async (
     category: template.category as WhatsAppTemplateCategory,
     status: template.status as WhatsAppTemplateStatus,
     variables: parseVariables(template.variables),
+    waba_id: (template as any).waba_id || null,
   }));
 };
 

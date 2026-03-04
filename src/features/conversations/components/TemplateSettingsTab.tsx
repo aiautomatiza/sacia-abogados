@@ -30,23 +30,42 @@ export function TemplateSettingsTab() {
   // Format templates to ensure variables are correctly extracted
   const templates = React.useMemo(() => {
     return rawTemplates.map((template) => {
+      // Helper: detect which component a position appears in
+      const detectComponent = (pos: number): 'HEADER' | 'BODY' | 'FOOTER' => {
+        const placeholder = `{{${pos}}}`;
+        if (template.header_text?.includes(placeholder)) return 'HEADER';
+        if (template.footer_text?.includes(placeholder)) return 'FOOTER';
+        return 'BODY';
+      };
+
+      const extractVars = (text: string | null, component: 'HEADER' | 'BODY' | 'FOOTER') => {
+        if (!text) return [];
+        const matches = text.match(/\{\{(\d+)\}\}/g);
+        if (!matches) return [];
+        const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
+        return positions.sort((a, b) => a - b).map(pos => ({
+          name: `Variable ${component} ${pos}`,
+          position: pos,
+          component
+        }));
+      };
+
+      // Parse variables per component: if stored in DB use detectComponent when missing
       let variables = Array.isArray(template.variables) && template.variables.length > 0
         ? template.variables.map((v: any) => ({
             name: v.name || '',
             position: v.position || 0,
+            component: v.component || detectComponent(v.position || 0),
           }))
         : [];
 
-      // If no variables in the field, extract from body_text (e.g., {{1}}, {{2}}) like in CampaignWizard
-      if (variables.length === 0 && template.body_text) {
-        const matches = template.body_text.match(/\{\{(\d+)\}\}/g);
-        if (matches) {
-          const positions = [...new Set(matches.map(m => parseInt(m.replace(/[{}]/g, ''))))];
-          variables = positions.sort((a, b) => a - b).map(pos => ({
-            name: `Variable ${pos}`,
-            position: pos,
-          }));
-        }
+      // If no variables in the field, extract from texts
+      if (variables.length === 0) {
+        variables = [
+          ...extractVars(template.header_text, 'HEADER'),
+          ...extractVars(template.body_text, 'BODY'),
+          ...extractVars(template.footer_text, 'FOOTER'),
+        ];
       }
 
       return {

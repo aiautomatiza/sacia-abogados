@@ -20,6 +20,7 @@ import type {
   TemplateVariable,
   TemplateVariableMapping,
   TemplateVariableSource,
+  TemplateComponentType,
 } from '../../types';
 
 interface TemplateVariableMapperProps {
@@ -62,20 +63,33 @@ export function TemplateVariableMapper({
     [variables]
   );
 
+  // Normalize mapping: fill in missing component field for old DB mappings
+  const normalizedMapping = useMemo(() => {
+    return mapping.map((m) => {
+      if (m.component) return m;
+      // Detect component from template texts
+      const placeholder = `{{${m.position}}}`;
+      let component: TemplateComponentType = 'BODY';
+      if (headerText?.includes(placeholder)) component = 'HEADER';
+      else if (footerText?.includes(placeholder)) component = 'FOOTER';
+      return { ...m, component };
+    });
+  }, [mapping, headerText, footerText]);
+
   // Get current mapping for a variable
-  const getMappingForVariable = (position: number): TemplateVariableMapping | undefined => {
-    return mapping.find((m) => m.position === position);
+  const getMappingForVariable = (position: number, component: TemplateComponentType): TemplateVariableMapping | undefined => {
+    return normalizedMapping.find((m) => m.position === position && m.component === component);
   };
 
   // Get the source type from a mapping
-  const getSourceType = (position: number): SourceType | '' => {
-    const m = getMappingForVariable(position);
+  const getSourceType = (position: number, component: TemplateComponentType): SourceType | '' => {
+    const m = getMappingForVariable(position, component);
     return m?.source.type || '';
   };
 
   // Get the selected value for a source type
-  const getSourceValue = (position: number): string => {
-    const m = getMappingForVariable(position);
+  const getSourceValue = (position: number, component: TemplateComponentType): string => {
+    const m = getMappingForVariable(position, component);
     if (!m) return '';
 
     switch (m.source.type) {
@@ -91,8 +105,8 @@ export function TemplateVariableMapper({
   };
 
   // Handle source type change
-  const handleSourceTypeChange = (position: number, variableName: string, sourceType: SourceType) => {
-    const newMapping = mapping.filter((m) => m.position !== position);
+  const handleSourceTypeChange = (position: number, component: TemplateComponentType, variableName: string, sourceType: SourceType) => {
+    const newMapping = normalizedMapping.filter((m) => !(m.position === position && m.component === component));
 
     // Create default source based on type
     let source: TemplateVariableSource;
@@ -110,6 +124,7 @@ export function TemplateVariableMapper({
 
     newMapping.push({
       position,
+      component,
       variableName,
       source,
     });
@@ -118,11 +133,11 @@ export function TemplateVariableMapper({
   };
 
   // Handle source value change
-  const handleSourceValueChange = (position: number, variableName: string, value: string) => {
-    const currentMapping = getMappingForVariable(position);
+  const handleSourceValueChange = (position: number, component: TemplateComponentType, variableName: string, value: string) => {
+    const currentMapping = getMappingForVariable(position, component);
     if (!currentMapping) return;
 
-    const newMapping = mapping.filter((m) => m.position !== position);
+    const newMapping = normalizedMapping.filter((m) => !(m.position === position && m.component === component));
 
     let source: TemplateVariableSource;
     switch (currentMapping.source.type) {
@@ -141,6 +156,7 @@ export function TemplateVariableMapper({
 
     newMapping.push({
       position,
+      component,
       variableName,
       source,
     });
@@ -150,12 +166,15 @@ export function TemplateVariableMapper({
 
   // Generate preview text by replacing variables with example values or real contact data
   const { previewHeader, previewBody, previewFooter } = useMemo(() => {
-    const replaceVars = (text: string | null | undefined) => {
+    const replaceVarsInComponent = (text: string | null | undefined, compType: TemplateComponentType) => {
       if (!text) return text;
       let result = text;
 
-      sortedVariables.forEach((variable) => {
-        const m = mapping.find((item) => item.position === variable.position);
+      // Filter variables that belong to this component
+      const componentVars = sortedVariables.filter((v) => v.component === compType);
+
+      componentVars.forEach((variable) => {
+        const m = normalizedMapping.find((item) => item.position === variable.position && item.component === compType);
         let value = `{{${variable.position}}}`;
 
         if (m) {
@@ -211,15 +230,15 @@ export function TemplateVariableMapper({
     };
 
     return {
-      previewHeader: replaceVars(headerText),
-      previewBody: replaceVars(bodyText),
-      previewFooter: replaceVars(footerText),
+      previewHeader: replaceVarsInComponent(headerText, 'HEADER'),
+      previewBody: replaceVarsInComponent(bodyText, 'BODY'),
+      previewFooter: replaceVarsInComponent(footerText, 'FOOTER'),
     };
-  }, [bodyText, headerText, footerText, sortedVariables, mapping, customFields, previewContact]);
+  }, [bodyText, headerText, footerText, sortedVariables, normalizedMapping, customFields, previewContact]);
 
   // Check if all variables are mapped
   const unmappedVariables = sortedVariables.filter((v) => {
-    const m = getMappingForVariable(v.position);
+    const m = getMappingForVariable(v.position, v.component);
     if (!m) return true;
     if (m.source.type === 'static_value' && !m.source.value) return true;
     if (m.source.type === 'custom_field' && !(m.source as { type: 'custom_field'; fieldName: string }).fieldName) return true;
@@ -239,12 +258,15 @@ export function TemplateVariableMapper({
       {/* Variable Mappers */}
       <div className="space-y-3">
         {sortedVariables.map((variable) => (
-          <Card key={variable.position} className="p-3 space-y-3">
+          <Card key={`${variable.component}-${variable.position}`} className="p-3 space-y-3">
             <div className="flex items-center gap-2">
               <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium">
                 {variable.position}
               </div>
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-normal border">
+                  {variable.component}
+                </span>
                 Variable {`{{${variable.position}}}`}
                 {variable.name && (
                   <span className="text-muted-foreground font-normal ml-1">
@@ -259,9 +281,9 @@ export function TemplateVariableMapper({
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Tipo de fuente</Label>
                 <Select
-                  value={getSourceType(variable.position)}
+                  value={getSourceType(variable.position, variable.component)}
                   onValueChange={(value) =>
-                    handleSourceTypeChange(variable.position, variable.name, value as SourceType)
+                    handleSourceTypeChange(variable.position, variable.component, variable.name, value as SourceType)
                   }
                 >
                   <SelectTrigger className="h-9">
@@ -293,11 +315,11 @@ export function TemplateVariableMapper({
               {/* Source Value Selector/Input */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Valor</Label>
-                {getSourceType(variable.position) === 'fixed_field' && (
+                {getSourceType(variable.position, variable.component) === 'fixed_field' && (
                   <Select
-                    value={getSourceValue(variable.position)}
+                    value={getSourceValue(variable.position, variable.component)}
                     onValueChange={(value) =>
-                      handleSourceValueChange(variable.position, variable.name, value)
+                      handleSourceValueChange(variable.position, variable.component, variable.name, value)
                     }
                   >
                     <SelectTrigger className="h-9">
@@ -313,11 +335,11 @@ export function TemplateVariableMapper({
                   </Select>
                 )}
 
-                {getSourceType(variable.position) === 'custom_field' && (
+                {getSourceType(variable.position, variable.component) === 'custom_field' && (
                   <Select
-                    value={getSourceValue(variable.position)}
+                    value={getSourceValue(variable.position, variable.component)}
                     onValueChange={(value) =>
-                      handleSourceValueChange(variable.position, variable.name, value)
+                      handleSourceValueChange(variable.position, variable.component, variable.name, value)
                     }
                   >
                     <SelectTrigger className="h-9">
@@ -333,18 +355,18 @@ export function TemplateVariableMapper({
                   </Select>
                 )}
 
-                {getSourceType(variable.position) === 'static_value' && (
+                {getSourceType(variable.position, variable.component) === 'static_value' && (
                   <Input
-                    value={getSourceValue(variable.position)}
+                    value={getSourceValue(variable.position, variable.component)}
                     onChange={(e) =>
-                      handleSourceValueChange(variable.position, variable.name, e.target.value)
+                      handleSourceValueChange(variable.position, variable.component, variable.name, e.target.value)
                     }
                     placeholder="Ingrese el valor"
                     className="h-9"
                   />
                 )}
 
-                {!getSourceType(variable.position) && (
+                {!getSourceType(variable.position, variable.component) && (
                   <div className="h-9 flex items-center text-sm text-muted-foreground">
                     Seleccione un tipo primero
                   </div>
@@ -363,7 +385,7 @@ export function TemplateVariableMapper({
             <p className="font-medium">Variables sin configurar</p>
             <p className="text-xs mt-1">
               Configura todas las variables antes de lanzar la campana:{' '}
-              {unmappedVariables.map((v) => `{{${v.position}}}`).join(', ')}
+              {unmappedVariables.map((v) => `${v.component} {{${v.position}}}`).join(', ')}
             </p>
           </div>
         </div>

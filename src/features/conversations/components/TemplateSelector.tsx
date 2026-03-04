@@ -18,7 +18,7 @@ import { useWhatsAppTemplatesForConversation } from "../hooks/useWhatsAppTemplat
 import type { ConversationWithContact } from "../types";
 
 // Type guard for template variables
-type TemplateVariable = { name: string; position: number };
+type TemplateVariable = { name: string; position: number; component: string };
 
 const isVariablesArray = (v: unknown): v is TemplateVariable[] => {
   return (
@@ -64,8 +64,16 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
         if (mappings && mappings.length > 0) {
           const newVariableValues: Record<string, string> = {};
           
+          // Helper: detect which component a given position belongs to (for legacy mappings)
+          const detectComponent = (pos: number): "HEADER" | "BODY" | "FOOTER" => {
+            const placeholder = `{{${pos}}}`;
+            if (selectedTemplate?.header_text?.includes(placeholder)) return "HEADER";
+            if (selectedTemplate?.footer_text?.includes(placeholder)) return "FOOTER";
+            return "BODY";
+          };
+
           mappings.forEach((mapping) => {
-            const { position, source } = mapping;
+            const { position, source, component } = mapping;
             let value = "";
             
             if (source.type === 'static_value') {
@@ -102,10 +110,11 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
                 }
               }
               value = value || "";
-              console.log(`[DEBUG] Mapping custom field ${source.fieldName}:`, { attributes, value });
             }
             
-            newVariableValues[position.toString()] = value;
+            const targetComponent = component || detectComponent(position);
+            const key = `${targetComponent}-${position}`;
+            newVariableValues[key] = value;
           });
           
           setVariableValues(newVariableValues);
@@ -124,7 +133,10 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   // Función para extraer variables del texto si no están definidas en BD
-  const extractVariablesFromText = (text: string): Array<{ name: string; position: number }> => {
+  const extractVariablesFromText = (
+    text: string | null,
+    component: "HEADER" | "BODY" | "FOOTER"
+  ): TemplateVariable[] => {
     if (!text) return [];
 
     const matches = text.match(/\{\{(\d+)\}\}/g);
@@ -134,8 +146,9 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     return positions
       .sort((a, b) => a - b)
       .map((pos) => ({
-        name: `Variable ${pos}`,
+        name: `Variable ${component} ${pos}`,
         position: pos,
+        component,
       }));
   };
 
@@ -143,41 +156,44 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
   const getTemplateVariables = (): TemplateVariable[] => {
     if (!selectedTemplate) return [];
 
-    // Si hay variables definidas en BD, usarlas
+    // Helper: detect which component a given position belongs to
+    const detectComponent = (pos: number): "HEADER" | "BODY" | "FOOTER" => {
+      const placeholder = `{{${pos}}}`;
+      if (selectedTemplate.header_text?.includes(placeholder)) return "HEADER";
+      if (selectedTemplate.footer_text?.includes(placeholder)) return "FOOTER";
+      return "BODY";
+    };
+
+    // Si hay variables definidas en BD, usarlas con detectComponent como fallback
     if (selectedTemplate.variables && isVariablesArray(selectedTemplate.variables)) {
-      return selectedTemplate.variables;
+      return selectedTemplate.variables.map((v) => ({
+        name: v.name || "",
+        position: v.position,
+        component: (v as any).component || detectComponent(v.position),
+      }));
     }
 
-    // Si no, extraer del texto
-    const bodyVars = extractVariablesFromText(selectedTemplate.body_text);
-    const headerVars = selectedTemplate.header_text ? extractVariablesFromText(selectedTemplate.header_text) : [];
-    const footerVars = selectedTemplate.footer_text ? extractVariablesFromText(selectedTemplate.footer_text) : [];
-
-    // Combinar y deduplicar por posición
-    const allVars = [...bodyVars, ...headerVars, ...footerVars];
-    const uniqueVars = allVars.reduce(
-      (acc, curr) => {
-        if (!acc.find((v) => v.position === curr.position)) {
-          acc.push(curr);
-        }
-        return acc;
-      },
-      [] as Array<{ name: string; position: number }>,
-    );
-
-    return uniqueVars.sort((a, b) => a.position - b.position);
+    // Si no, extraer del texto (manteniendo separadas por componente)
+    return [
+      ...extractVariablesFromText(selectedTemplate.header_text, "HEADER"),
+      ...extractVariablesFromText(selectedTemplate.body_text, "BODY"),
+      ...extractVariablesFromText(selectedTemplate.footer_text, "FOOTER"),
+    ];
   };
 
   const templateVariables = getTemplateVariables();
 
   // Función para reemplazar variables en el texto
-  const replaceVariables = (text: string): string => {
+  const replaceVariables = (text: string, component: string): string => {
     if (!text) return text;
 
     let result = text;
-    templateVariables.forEach((variable) => {
+    const componentVariables = templateVariables.filter((v) => v.component === component);
+
+    componentVariables.forEach((variable) => {
       const position = variable.position.toString();
-      const value = variableValues[position];
+      const key = `${component}-${position}`;
+      const value = variableValues[key];
       const placeholder = `{{${position}}}`;
       
       let safeValue = placeholder;
@@ -193,10 +209,10 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     return result;
   };
 
-  const handleVariableChange = (position: number, value: string) => {
+  const handleVariableChange = (position: number, component: string, value: string) => {
     setVariableValues({
       ...variableValues,
-      [position.toString()]: value,
+      [`${component}-${position}`]: value,
     });
   };
 
@@ -204,9 +220,9 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
     if (!selectedTemplateId || !selectedTemplate) return;
     
     // Construir el contenido completo con variables reemplazadas
-    const headerResolved = selectedTemplate.header_text ? replaceVariables(selectedTemplate.header_text) : "";
-    const bodyResolved = replaceVariables(selectedTemplate.body_text);
-    const footerResolved = selectedTemplate.footer_text ? replaceVariables(selectedTemplate.footer_text) : "";
+    const headerResolved = selectedTemplate.header_text ? replaceVariables(selectedTemplate.header_text, "HEADER") : "";
+    const bodyResolved = replaceVariables(selectedTemplate.body_text, "BODY");
+    const footerResolved = selectedTemplate.footer_text ? replaceVariables(selectedTemplate.footer_text, "FOOTER") : "";
     
     const resolvedContent = [headerResolved, bodyResolved, footerResolved]
       .filter(Boolean)
@@ -284,15 +300,18 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
               <Label className="text-sm font-medium">Variables de la plantilla</Label>
               <div className="space-y-3">
                 {templateVariables.map((variable) => (
-                  <div key={variable.position} className="space-y-1">
-                    <Label htmlFor={`var-${variable.position}`} className="text-xs text-muted-foreground">
+                  <div key={`${variable.component}-${variable.position}`} className="space-y-1">
+                    <Label htmlFor={`var-${variable.component}-${variable.position}`} className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-normal border">
+                        {variable.component}
+                      </span>
                       {variable.name}
                     </Label>
                     <Input
-                      id={`var-${variable.position}`}
+                      id={`var-${variable.component}-${variable.position}`}
                       placeholder={`Ingresa ${variable.name.toLowerCase()}...`}
-                      value={variableValues[variable.position.toString()] || ""}
-                      onChange={(e) => handleVariableChange(variable.position, e.target.value)}
+                      value={variableValues[`${variable.component}-${variable.position}`] || ""}
+                      onChange={(e) => handleVariableChange(variable.position, variable.component as string, e.target.value)}
                       className="bg-background"
                     />
                   </div>
@@ -306,11 +325,11 @@ export function TemplateSelector({ conversationId, contact, onSelect, onCancel }
             <div className="space-y-2">
               <p className="text-sm font-medium">Preview de la plantilla:</p>
               {selectedTemplate.header_text && (
-                <p className="text-sm font-semibold">{replaceVariables(selectedTemplate.header_text)}</p>
+                <p className="text-sm font-semibold whitespace-pre-wrap">{replaceVariables(selectedTemplate.header_text, "HEADER")}</p>
               )}
-              <p className="text-sm whitespace-pre-wrap">{replaceVariables(selectedTemplate.body_text)}</p>
+              <p className="text-sm whitespace-pre-wrap">{replaceVariables(selectedTemplate.body_text, "BODY")}</p>
               {selectedTemplate.footer_text && (
-                <p className="text-xs text-muted-foreground">{replaceVariables(selectedTemplate.footer_text)}</p>
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap">{replaceVariables(selectedTemplate.footer_text, "FOOTER")}</p>
               )}
             </div>
           </Card>
