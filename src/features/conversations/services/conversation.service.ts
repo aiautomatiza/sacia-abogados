@@ -230,7 +230,7 @@ export const listConversations = async ({
 
   // Aplicar ordenamiento dinámico
   const sortOrder = filters.sort_order === 'asc';
-  
+
   switch (filters.sort_by) {
     case 'created_at':
       query = query.order("created_at", { ascending: sortOrder, nullsFirst: false });
@@ -250,7 +250,7 @@ export const listConversations = async ({
       query = query.order("last_message_at", { ascending: sortOrder, nullsFirst: false });
       break;
   }
-  
+
   query = query.range(offset, offset + pageSize - 1);
 
   const { data, error, count } = await query;
@@ -261,7 +261,7 @@ export const listConversations = async ({
   }
 
   let conversations = (data as ConversationWithContact[]) || [];
-  
+
   // Ordenar por nombre client-side si es necesario (no se puede hacer en PostgREST para relaciones)
   if (filters.sort_by === 'name') {
     conversations = [...conversations].sort((a, b) => {
@@ -271,7 +271,7 @@ export const listConversations = async ({
       return sortOrder ? comparison : -comparison;
     });
   }
-  
+
   const total = count || 0;
   const totalPages = Math.ceil(total / pageSize);
 
@@ -645,8 +645,12 @@ export const sendMessage = async (
   input: SendMessageInput,
   scope: UserScope
 ): Promise<MessageWithSender | null> => {
+  console.log("[SendMessage Debug] Raw input received by service:", JSON.stringify(input, null, 2));
+
   // Validate input with Zod
   const validated = sendMessageSchema.parse(input);
+
+  console.log("[SendMessage Debug] Validated metadata after Zod parse:", JSON.stringify(validated.metadata, null, 2));
 
   // SECURITY: Get conversation and validate tenant ownership
   const { data: conversation, error: convError } = await supabase
@@ -705,17 +709,31 @@ export const sendMessage = async (
 
     // Call Edge Function to send message to external channel (WhatsApp, etc.)
     // Note: Supabase client automatically includes the auth token
-    const payload = {
+    let functionName = "send-conversation-message";
+    let payload: any = {
       message_id: message.id,
       conversation_id: validated.conversation_id,
       phone_number_id: conversation?.whatsapp_number_id || null,
     };
 
-    console.log("[SendMessage] Invoking Edge Function with payload:", payload);
+    const meta = validated.metadata as Record<string, any> || {};
+
+    if (meta.is_template && meta.template_internal_id) {
+      functionName = "send-template-message";
+      payload = {
+        message_id: message.id,
+        conversation_id: validated.conversation_id,
+        template_id: meta.template_internal_id,
+        template_variables: meta.template_variables,
+        phone_number_id: conversation?.whatsapp_number_id || null,
+      };
+    }
+
+    console.log(`[SendMessage] Invoking Edge Function ${functionName} with payload:`, payload);
 
     try {
       const { data: fnData, error: fnError } = await supabase.functions
-        .invoke("send-conversation-message", {
+        .invoke(functionName, {
           body: payload,
         });
 

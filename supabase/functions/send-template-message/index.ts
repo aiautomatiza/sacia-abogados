@@ -63,15 +63,7 @@ serve(async (req) => {
         `
         *,
         contact:crm_contacts!conversations_contact_id_fkey (
-          id,
-          name,
-          phone,
-          email,
-          state
-        ),
-        clinic:org_clinics!conversations_clinic_id_fkey (
-          id,
-          name
+          id, nombre, numero, attributes
         )
       `,
       )
@@ -196,7 +188,7 @@ serve(async (req) => {
     }
 
     // 6. Validate contact has phone for WhatsApp
-    if (!conversation.contact?.phone) {
+    if (!conversation.contact?.numero) {
       console.error("[Template Webhook] Contact missing phone for WhatsApp template");
       await supabaseClient
         .from("conversation_messages")
@@ -216,6 +208,30 @@ serve(async (req) => {
     const webhookPayload = {
       event: "template_message_sent",
       timestamp: new Date().toISOString(),
+
+      // -- n8n Campaign Fallback Support -- 
+      // The local n8n workflow expects 'contacts' as an array and 'config' with phone_number_id
+      contacts: conversation.contact ? [
+        {
+          id: conversation.id, // n8n uses id from 'Gestionar Contacto' assuming it's the conversation.id
+          numero: conversation.contact.numero,
+          nombre: conversation.contact.nombre,
+          attributes: conversation.contact.attributes,
+          variables: template_variables || {},
+          resolved_variables: Object.entries(template_variables || {}).map(([key, value]) => ({
+            position: key,
+            value: value
+          }))
+        }
+      ] : [],
+      config: {
+        template_id: template.template_id,
+        template_name: template.name,
+        language: template.language,
+        phone_number_id: phone_number_id || conversation.whatsapp_number_id || null,
+      },
+      // ------------------------------------
+
       message: {
         id: message.id,
         content: message.content,
@@ -244,32 +260,31 @@ serve(async (req) => {
       },
       contact: conversation.contact
         ? {
-            id: conversation.contact.id,
-            name: conversation.contact.name,
-            phone: conversation.contact.phone,
-            email: conversation.contact.email,
-            state: conversation.contact.state,
-          }
+          id: conversation.contact.id,
+          nombre: conversation.contact.nombre,
+          numero: conversation.contact.numero,
+          attributes: conversation.contact.attributes,
+        }
         : null,
       sender: senderData
         ? {
-            id: senderData.id,
-            full_name: senderData.full_name,
-            email: senderData.email,
-            type: message.sender_type,
-          }
+          id: senderData.id,
+          full_name: senderData.full_name,
+          email: senderData.email,
+          type: message.sender_type,
+        }
         : null,
       account: accountData
         ? {
-            id: accountData.id,
-            name: accountData.name,
-          }
+          id: accountData.id,
+          name: accountData.name,
+        }
         : null,
-      clinic: conversation.clinic
+      tenant: conversation.tenant_id
         ? {
-            id: conversation.clinic.id,
-            name: conversation.clinic.name,
-          }
+          id: conversation.tenant_id,
+          tenant_id: conversation.tenant_id, // Added tenant_id for n8n filter
+        }
         : null,
     };
 

@@ -172,6 +172,7 @@ export function MessageInput({ conversation, currentUserId, onSendMessage, onUpl
           template_id: data.templateExternalId,
           template_name: data.templateName,
           template_variables: data.variableValues,
+          template_internal_id: data.templateId,
         },
       } as Parameters<typeof onSendMessage>[0]);
       
