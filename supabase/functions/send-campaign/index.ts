@@ -70,8 +70,68 @@ function resolveSourceValue(
   }
 }
 
+// Parse template variables from DB format (same as send-template-message)
+function parseTemplateVariables(variables: any): Array<{ name: string; position: number; component: string }> {
+  if (!variables) return [];
+
+  if (Array.isArray(variables)) {
+    return variables.map((v: any) => ({
+      name: v.name || '',
+      position: v.position || 0,
+      component: v.component || 'BODY',
+    }));
+  }
+
+  if (typeof variables === 'object' && 'items' in variables) {
+    return (variables.items as any[]).map((v: any) => ({
+      name: v.name || '',
+      position: v.position || 0,
+      component: v.component || 'BODY',
+    }));
+  }
+
+  return [];
+}
+
+// Detect which component a variable position belongs to based on template texts (fallback)
+function detectComponentFromText(
+  position: number,
+  headerText: string | null,
+  bodyText: string | null,
+  footerText: string | null
+): 'HEADER' | 'BODY' | 'FOOTER' {
+  const placeholder = `{{${position}}}`;
+  if (headerText?.includes(placeholder)) return 'HEADER';
+  if (footerText?.includes(placeholder)) return 'FOOTER';
+  return 'BODY';
+}
+
+// Normalize variable mappings by adding correct component from template.variables or text detection
+function normalizeVariableMapping(
+  variableMapping: VariableMapping[],
+  templateVariables: Array<{ name: string; position: number; component: string }>,
+  headerText: string | null,
+  bodyText: string | null,
+  footerText: string | null
+): VariableMapping[] {
+  return variableMapping.map((mapping) => {
+    // If mapping already has component, use it
+    if (mapping.component) return mapping;
+
+    // Try to find component from template.variables (most reliable)
+    const templateVar = templateVariables.find(tv => tv.position === mapping.position);
+    if (templateVar?.component) {
+      return { ...mapping, component: templateVar.component as 'HEADER' | 'BODY' | 'FOOTER' };
+    }
+
+    // Fallback: detect from template texts
+    const component = detectComponentFromText(mapping.position, headerText, bodyText, footerText);
+    return { ...mapping, component };
+  });
+}
+
 // Resolve variables for a single contact based on the mapping.
-// Returns an array of resolved variables for backward compatibility with n8n.
+// Returns an array of resolved variables grouped by component for n8n.
 function resolveVariablesForContact(
   contact: { numero: string; nombre: string | null; attributes: Record<string, any>; location?: any },
   variableMapping: VariableMapping[]
@@ -87,7 +147,14 @@ function resolveVariablesForContact(
       position: mapping.position,
       component: mapping.component || 'BODY',
     };
-  }).sort((a, b) => a.position - b.position);
+  }).sort((a, b) => {
+    // Sort by component first (HEADER, BODY, FOOTER), then by position
+    const componentOrder = { 'HEADER': 0, 'BODY': 1, 'FOOTER': 2 };
+    const compA = componentOrder[a.component as keyof typeof componentOrder] ?? 1;
+    const compB = componentOrder[b.component as keyof typeof componentOrder] ?? 1;
+    if (compA !== compB) return compA - compB;
+    return a.position - b.position;
+  });
 }
 
 // Function to fetch contacts in batches
@@ -251,6 +318,37 @@ Deno.serve(async (req) => {
     if (channel === 'whatsapp' && variable_mapping && variable_mapping.length > 0) {
       console.log(`Resolviendo ${variable_mapping.length} variables para ${contacts.length} contactos`);
 
+      // Fetch template to get variables, header_text, body_text, footer_text for component detection
+      // This mirrors the logic in send-template-message for consistency
+      let normalizedMapping = variable_mapping;
+      if (template_id) {
+        const { data: templateData, error: templateError } = await userClient
+          .from('whatsapp_templates')
+          .select('variables, header_text, body_text, footer_text')
+          .eq('id', template_id)
+          .maybeSingle();
+
+        if (templateError) {
+          console.warn('Error fetching template for component detection:', templateError.message);
+        } else if (templateData) {
+          // Parse template variables (same format as send-template-message)
+          const templateVariables = parseTemplateVariables(templateData.variables);
+          console.log(`Template has ${templateVariables.length} variables defined:`,
+            templateVariables.map(v => `${v.component}-${v.position}`).join(', '));
+
+          // Normalize mappings to ensure correct component assignment
+          normalizedMapping = normalizeVariableMapping(
+            variable_mapping,
+            templateVariables,
+            templateData.header_text,
+            templateData.body_text,
+            templateData.footer_text
+          );
+          console.log(`Normalized ${normalizedMapping.length} variable mappings:`,
+            normalizedMapping.map(m => `${m.component}-${m.position}`).join(', '));
+        }
+      }
+
       // Fetch unique locations found in contacts
       const locationIds = [...new Set(contacts.map(c => c.location_id).filter(Boolean))];
       let locations: Record<string, any> = {};
@@ -274,7 +372,7 @@ Deno.serve(async (req) => {
         location: contact.location_id ? locations[contact.location_id] : null,
         resolved_variables: resolveVariablesForContact(
           { ...contact, location: contact.location_id ? locations[contact.location_id] : null },
-          variable_mapping
+          normalizedMapping
         ),
       }));
     }
